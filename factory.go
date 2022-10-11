@@ -8,6 +8,7 @@ import (
 // https://medium.com/@phanindramoganti/regex-under-the-hood-implementing-a-simple-regex-compiler-in-go-ef2af5c6079
 // https://github.com/phanix5/Simple-Regex-Complier-in-Go/blob/master/regex.go
 // https://www.oilshell.org/archive/Thompson-1968.pdf
+// https://swtch.com/~rsc/regexp/regexp1.html
 
 type reFactory[T comparable] struct {
 	compiler *Compiler[T]
@@ -40,7 +41,8 @@ type State[T comparable] struct {
 	c int
 
 	// oClass is set if c is 0
-	oClass *Class[T]
+	oClass   *Class[T]
+	negation bool
 
 	out, out1 *State[T]
 	lastlist  int
@@ -63,29 +65,37 @@ func (s *State[T]) Repr0() string {
 }
 
 func (s *State[T]) Repr() string {
-	return s.ReprN(0)
+	saw := make(map[*State[T]]bool)
+	return s.ReprN(0, saw)
 }
 
-func (s *State[T]) ReprN(n int) string {
+func (s *State[T]) ReprN(n int, saw map[*State[T]]bool) string {
+	saw[s] = true
 	indent := strings.Repeat("  ", n)
 	txt := fmt.Sprintf("%s%s", indent, s.Repr0())
-	if s.out != nil {
-		txt += "\n" + s.out.ReprN(n+1)
+	if s.out != nil && !saw[s.out] {
+		txt += "\n" + s.out.ReprN(n+1, saw)
 	}
-	if s.out1 != nil {
-		txt += "\n" + s.out1.ReprN(n+1)
+	if s.out1 != nil && !saw[s.out1] {
+		txt += "\n" + s.out1.ReprN(n+1, saw)
 	}
 	return txt
 }
 
 // Won't need this
 func (s *State[T]) RecursiveClearState() {
+	saw := make(map[*State[T]]bool)
+	s._recursiveClearState(saw)
+}
+
+func (s *State[T]) _recursiveClearState(saw map[*State[T]]bool) {
+	saw[s] = true
 	s.lastlist = 0
-	if s.out != nil {
-		s.out.RecursiveClearState()
+	if s.out != nil && !saw[s.out] {
+		s.out._recursiveClearState(saw)
 	}
-	if s.out1 != nil {
-		s.out1.RecursiveClearState()
+	if s.out1 != nil && !saw[s.out1] {
+		s.out1._recursiveClearState(saw)
 	}
 }
 
@@ -97,7 +107,11 @@ type Frag[T comparable] struct {
 func (s *Frag[T]) Repr() string {
 	out_repr := make([]string, len(s.out))
 	for i, o := range s.out {
-		out_repr[i] = (*o).Repr()
+		if *o == nil {
+			out_repr[i] = "<nil>"
+		} else {
+			out_repr[i] = (*o).Repr()
+		}
 	}
 	return fmt.Sprintf("start: %s out: %v", s.start.Repr(), out_repr)
 }
@@ -129,10 +143,53 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 		if !has {
 			return fmt.Errorf("No such class name '%s' at pos %d", token.name, token.pos)
 		}
-		ns := State[T]{oClass: oclass, out: nil, out1: nil}
+		ns := State[T]{oClass: oclass, negation: token.negation,
+			out: nil, out1: nil}
 		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
+
+	case tConcat:
+		s.stp--
+		e2 := s.stack[s.stp]
+		s.stp--
+		e1 := s.stack[s.stp]
+		// concatenate
+		s.patch(e1.out, e2.start)
+		s.stack[s.stp] = Frag[T]{e1.start, e2.out}
+		s.stp++
+		// No need to call ensure_stack_space here; we popped 2
+		// and added 1
+
+	case tGlobQuestion: // 0 or 1
+		s.stp--
+		e := s.stack[s.stp]
+		ns := State[T]{c: NSplit, out: e.start}
+		s.stack[s.stp] = Frag[T]{&ns, append(e.out, &ns.out1)}
+		s.stp++
+		// No need to call ensure_stack_space here; we popped 1
+		// and added 1
+
+	case tGlobStar: // 0 or more
+		s.stp--
+		e := s.stack[s.stp]
+		ns := State[T]{c: NSplit, out: e.start}
+		s.patch(e.out, &ns)
+		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out1}}
+		s.stp++
+		// No need to call ensure_stack_space here; we popped 1
+		// and added 1
+
+	case tGlobPlus: // 1 or more
+		s.stp--
+		e := s.stack[s.stp]
+		ns := State[T]{c: NSplit, out: e.start}
+		s.patch(e.out, &ns)
+		s.stack[s.stp] = Frag[T]{e.start, []**State[T]{&ns.out1}}
+		s.stp++
+		// No need to call ensure_stack_space here; we popped 1
+		// and added 1
+
 	}
 	return nil
 }
@@ -243,7 +300,9 @@ func (s *reFactory[T]) compile(text string) (*Regexp[T], error) {
 			e.Repr()))
 	}
 	re := &Regexp[T]{}
+	re.matchstate.c = NMatch
 
+	fmt.Printf("patching\n")
 	s.patch(e.out, &re.matchstate)
 	re.nfa = e.start
 

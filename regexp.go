@@ -30,7 +30,6 @@ func (s *Regexp[T]) Match(input []T) Match[T] {
 
 	vars := make(map[string]Range)
 	matched := s.match(s.nfa, input)
-	fmt.Printf(".... got %v\n", matched)
 	if matched {
 		return Match[T]{
 			Success: true,
@@ -96,6 +95,10 @@ func (s *Regexp[T]) step(clist []*State[T], ch T, nlist []*State[T]) []*State[T]
 			continue
 		}
 		m := ns.oClass.Matches(ch)
+		// Are we testing for non-memberhood?
+		if ns.negation {
+			m = !m
+		}
 		fmt.Printf("step: clist %d %s => %v\n", i, ns.Repr0(), m)
 		// TODO - how to record the output?
 		if m {
