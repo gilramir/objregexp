@@ -161,6 +161,17 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 		// No need to call ensure_stack_space here; we popped 2
 		// and added 1
 
+	case tAlternate: // |
+		s.stp--
+		e2 := s.stack[s.stp]
+		s.stp--
+		e1 := s.stack[s.stp]
+		ns := State[T]{c: NSplit, out: e1.start, out1: e2.start}
+		s.stack[s.stp] = Frag[T]{&ns, append(e1.out, e2.out...)}
+		s.stp++
+		// No need to call ensure_stack_space here; we popped 2
+		// and added 1
+
 	case tGlobQuestion: // 0 or 1
 		s.stp--
 		e := s.stack[s.stp]

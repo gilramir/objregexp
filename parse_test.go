@@ -112,3 +112,39 @@ func (s *MySuite) TestParser09(c *C) {
 	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
 	c.Check(tokens[4].ttype, Equals, tokenType(tConcat))
 }
+
+func (s *MySuite) TestParser10(c *C) {
+	text := "[:foo:] | [:bar:]"
+	tokens, err := parseRegex(text)
+	c.Assert(err, IsNil)
+
+	c.Assert(len(tokens), Equals, 3)
+
+	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].name, Equals, "foo")
+
+	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].name, Equals, "bar")
+
+	c.Check(tokens[2].ttype, Equals, tokenType(tAlternate))
+}
+
+func (s *MySuite) TestParser11(c *C) {
+	text := "[:foo:] | [:bar:][:bar:]"
+	tokens, err := parseRegex(text)
+	c.Assert(err, IsNil)
+
+	c.Assert(len(tokens), Equals, 5)
+
+	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].name, Equals, "foo")
+
+	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].name, Equals, "bar")
+
+	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[2].name, Equals, "bar")
+
+	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
+	c.Check(tokens[4].ttype, Equals, tokenType(tAlternate))
+}

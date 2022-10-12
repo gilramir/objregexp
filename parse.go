@@ -21,6 +21,7 @@ const (
 	tError        tokenType = "E"
 	tClass                  = "C" // [:alpha:]
 	tConcat                 = "." // concatenate, for internal postfix notation
+	tAlternate              = "|" // alternate choices
 	tGlobStar               = "*" // *
 	tGlobPlus               = "+" // +
 	tGlobQuestion           = "?" // ?
@@ -76,6 +77,10 @@ type reParserState struct {
 
 	firstAtomEmitted            bool
 	firstInsideParenAtomEmitted bool
+
+	alternationInProgress bool
+
+	sawError bool
 }
 
 func (s *reParserState) Initialize() {
@@ -93,6 +98,14 @@ func (s *reParserState) goparse() {
 	var state stateFunc
 	for state = s.stateNewAtom; state != nil; {
 		state = state()
+	}
+
+	if !s.sawError {
+		if s.alternationInProgress {
+			s.tokenChan <- tokenT{
+				ttype: tAlternate,
+			}
+		}
 	}
 
 	// Are we in an incomplete state?
@@ -128,6 +141,7 @@ func (s *reParserState) emitErrorf(f string, args ...any) {
 		pos:   s.pos,
 		err:   fmt.Errorf(f, args...),
 	}
+	s.sawError = true
 }
 
 func (s *reParserState) emitRuneError() {
@@ -200,6 +214,17 @@ func (s *reParserState) stateNewAtom() stateFunc {
 		s.insideClass = true
 		s.classStartPos = startPos
 		return s.stateClass
+	case '|':
+		// This cannot be the first thing
+		if !s.firstAtomEmitted {
+			s.emitErrorf("'|' cannot occur at pos %d", s.pos)
+			return nil
+		}
+		// This is alternation outside of a paren.
+		// We reset our knoweldge of having emitted anything
+		s.firstAtomEmitted = false
+		s.alternationInProgress = true
+		return s.stateNewAtom
 	case ' ':
 		return s.stateNewAtom
 	case '\n':
