@@ -13,7 +13,6 @@ import (
 // lparen		( or (?P<name>
 // rparen		)
 // curlies		{1} or {1,2}
-// error
 
 type tokenType string
 
@@ -21,7 +20,7 @@ type tokenType string
 const (
 	tError        tokenType = "E"
 	tClass                  = "C" // [:alpha:]
-	tConcat                 = "." // conctenate, for internal postfix notation
+	tConcat                 = "." // concatenate, for internal postfix notation
 	tGlobStar               = "*" // *
 	tGlobPlus               = "+" // +
 	tGlobQuestion           = "?" // ?
@@ -196,7 +195,7 @@ func (s *reParserState) stateNewAtom() stateFunc {
 	case '(':
 		s.insideParen = true
 		s.firstInsideParenAtomEmitted = false
-		return s.stateOpenParen
+		return s.stateInsideParenNewAtom
 	case '[':
 		s.insideClass = true
 		s.classStartPos = startPos
@@ -303,12 +302,7 @@ func (s *reParserState) stateClass() stateFunc {
 	}
 
 	if s.insideParen {
-		if s.firstInsideParenAtomEmitted {
-			s.emitConcatenation()
-		} else {
-			s.firstInsideParenAtomEmitted = true
-		}
-		return s.stateInsideParen
+		return s.stateInsideParenAfterClass
 	} else {
 		return s.stateAfterClass
 	}
@@ -332,8 +326,7 @@ func (s *reParserState) stateAfterClass() stateFunc {
 		s.emitRuneError()
 		return nil
 	}
-	// If we already emitted something, we can see
-	// a count modifier
+	// At this point we can see a count modifier
 	switch r {
 	case '*':
 		_, _ = s.consumeNextRune()
@@ -364,10 +357,80 @@ func (s *reParserState) stateAfterClass() stateFunc {
 	return s.stateNewAtom
 }
 
-func (s *reParserState) stateOpenParen() stateFunc {
-	return nil
+func (s *reParserState) stateInsideParenNewAtom() stateFunc {
+	startPos := s.pos
+	ok, r, eof := s.getNextRune()
+	if eof {
+		s.emitUnexpectedEOF()
+		return nil
+	}
+	if !ok {
+		s.emitRuneError()
+		return nil
+	}
+
+	// We can expect a groups or whitespace, or closingparen
+
+	switch r {
+	case ')':
+		s.insideParen = false
+		s.firstInsideParenAtomEmitted = false
+		// Yes, we can return stateAfterClass here
+		return s.stateAfterClass
+	case '[':
+		s.insideClass = true
+		s.classStartPos = startPos
+		return s.stateClass
+	case ' ':
+		return s.stateInsideParenNewAtom
+	case '\n':
+		return s.stateInsideParenNewAtom
+	case '\t':
+		return s.stateInsideParenNewAtom
+	default:
+		s.emitErrorf("At position %d '%c' is illegal",
+			s.pos, r)
+		return nil
+	}
 }
 
-func (s *reParserState) stateInsideParen() stateFunc {
-	return nil
+func (s *reParserState) stateInsideParenAfterClass() stateFunc {
+	ok, r, eof := s.peekNextRune()
+	if eof {
+		s.emitUnexpectedEOF()
+		return nil
+	}
+	if !ok {
+		s.emitRuneError()
+		return nil
+	}
+	// At this point we can see a count modifier
+	switch r {
+	case '*':
+		_, _ = s.consumeNextRune()
+		s.tokenChan <- tokenT{
+			ttype: tGlobStar,
+			pos:   s.pos,
+		}
+	case '+':
+		_, _ = s.consumeNextRune()
+		s.tokenChan <- tokenT{
+			ttype: tGlobPlus,
+			pos:   s.pos,
+		}
+	case '?':
+		_, _ = s.consumeNextRune()
+		s.tokenChan <- tokenT{
+			ttype: tGlobQuestion,
+			pos:   s.pos,
+		}
+	default:
+		// no-op
+	}
+	if s.firstInsideParenAtomEmitted {
+		s.emitConcatenation()
+	} else {
+		s.firstInsideParenAtomEmitted = true
+	}
+	return s.stateInsideParenNewAtom
 }

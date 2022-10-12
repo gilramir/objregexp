@@ -92,3 +92,23 @@ func (s *MySuite) TestParser08(c *C) {
 
 	c.Check(tokens[1].ttype, Equals, tokenType(tGlobQuestion))
 }
+
+func (s *MySuite) TestParser09(c *C) {
+	text := "[:foo:] ([:alpha:][:bar:])"
+	tokens, err := parseRegex(text)
+	c.Assert(err, IsNil)
+
+	c.Assert(len(tokens), Equals, 5)
+
+	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].name, Equals, "foo")
+
+	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].name, Equals, "alpha")
+
+	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[2].name, Equals, "bar")
+
+	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
+	c.Check(tokens[4].ttype, Equals, tokenType(tConcat))
+}

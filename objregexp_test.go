@@ -239,3 +239,65 @@ func (s *MySuite) TestGlob03(c *C) {
 	m = re_vg.Match(input)
 	c.Check(m.Success, Equals, false)
 }
+
+// Test paren with no glob
+func (s *MySuite) TestParen01(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+
+	compiler.RegisterClass(VowelClass)
+	compiler.RegisterClass(DigitClass)
+	compiler.Finalize()
+
+	re_vg, err := compiler.Compile("[:vowel:] ([:digit:][:digit:])")
+	c.Assert(err, IsNil)
+
+	input := []rune{'B'}
+	m := re_vg.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'A'}
+	m = re_vg.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'A', '9'}
+	m = re_vg.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'A', '9', '8'}
+	m = re_vg.Match(input)
+	c.Check(m.Success, Equals, true)
+}
+
+// Test paren with glob
+func (s *MySuite) TestParen02(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+
+	compiler.RegisterClass(VowelClass)
+	compiler.RegisterClass(DigitClass)
+	compiler.Finalize()
+
+	re_vg, err := compiler.Compile("[:vowel:] ([:digit:][:vowel:])?")
+	c.Assert(err, IsNil)
+
+	input := []rune{'B'}
+	m := re_vg.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'A'}
+	m = re_vg.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'A', '9'}
+	m = re_vg.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'A', '9', '8'}
+	m = re_vg.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'A', '9', '9'}
+	m = re_vg.Match(input)
+	c.Check(m.Success, Equals, false)
+}
