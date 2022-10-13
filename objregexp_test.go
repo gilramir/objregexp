@@ -67,7 +67,7 @@ func ioMapper(name string, inputTarget string) *TASTNode {
 */
 
 // SImple one-class test
-func (s *MySuite) TestOClass01(c *C) {
+func (s *MySuite) TestClass01(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
@@ -78,22 +78,22 @@ func (s *MySuite) TestOClass01(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'A'}
-	m := re_vowel.Match(input)
+	m := re_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'B'}
-	m = re_vowel.Match(input)
+	m = re_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	// Check that state is re-set properly and that
 	// a match can happen again.
 	input = []rune{'A'}
-	m = re_vowel.Match(input)
+	m = re_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 }
 
 // Test negation
-func (s *MySuite) TestOClass02(c *C) {
+func (s *MySuite) TestClass02(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
@@ -104,22 +104,22 @@ func (s *MySuite) TestOClass02(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'A'}
-	m := re_not_vowel.Match(input)
+	m := re_not_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'B'}
-	m = re_not_vowel.Match(input)
+	m = re_not_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	// Check that state is re-set properly and that
 	// a failed-match can happen again.
 	input = []rune{'A'}
-	m = re_not_vowel.Match(input)
+	m = re_not_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }
 
 // Test two-classes in sequence
-func (s *MySuite) TestOClass03(c *C) {
+func (s *MySuite) TestClass03(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
@@ -131,19 +131,19 @@ func (s *MySuite) TestOClass03(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'A'}
-	m := re_vc.Match(input)
+	m := re_vc.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'B', 'A'}
-	m = re_vc.Match(input)
+	m = re_vc.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'E', '9'}
-	m = re_vc.Match(input)
+	m = re_vc.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'E', 'T'}
-	m = re_vc.Match(input)
+	m = re_vc.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 }
 
@@ -159,23 +159,23 @@ func (s *MySuite) TestGlob01(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'B'}
-	m := re_vg.Match(input)
+	m := re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A', 'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A', 'A', 'B'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }
 
@@ -191,23 +191,23 @@ func (s *MySuite) TestGlob02(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'B'}
-	m := re_vg.Match(input)
+	m := re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A', 'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A', 'A', 'B'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }
 
@@ -223,20 +223,20 @@ func (s *MySuite) TestGlob03(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'B'}
-	m := re_vg.Match(input)
+	m := re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	// TODO - this needs to change to true + consumed
 	input = []rune{'A', 'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }
 
@@ -253,19 +253,19 @@ func (s *MySuite) TestParen01(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'B'}
-	m := re_vg.Match(input)
+	m := re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A', '9'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A', '9', '8'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 }
 
@@ -282,22 +282,22 @@ func (s *MySuite) TestParen02(c *C) {
 	c.Assert(err, IsNil)
 
 	input := []rune{'B'}
-	m := re_vg.Match(input)
+	m := re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A', '9'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A', '9', '8'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A', '9', '9'}
-	m = re_vg.Match(input)
+	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }

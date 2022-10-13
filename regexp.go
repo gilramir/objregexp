@@ -21,10 +21,11 @@ type Range struct {
 
 type Match[T comparable] struct {
 	Success bool
+	Range   Range
 	Group   map[string]Range
 }
 
-func (s *Regexp[T]) Match(input []T) Match[T] {
+func (s *Regexp[T]) FullMatch(input []T) Match[T] {
 	s.listid = 0
 	s.nfa.RecursiveClearState()
 
@@ -34,6 +35,32 @@ func (s *Regexp[T]) Match(input []T) Match[T] {
 		return Match[T]{
 			Success: true,
 			Group:   vars,
+			Range: Range{
+				Start: 0,
+				End:   len(input),
+			},
+		}
+	} else {
+		return Match[T]{
+			Success: false,
+			Group:   make(map[string]Range),
+		}
+	}
+}
+func (s *Regexp[T]) Match(input []T) Match[T] {
+	s.listid = 0
+	s.nfa.RecursiveClearState()
+
+	vars := make(map[string]Range)
+	matched, n := s.match2(s.nfa, input, 0)
+	if matched {
+		return Match[T]{
+			Success: true,
+			Range: Range{
+				Start: 0,
+				End:   n,
+			},
+			Group: vars,
 		}
 	} else {
 		return Match[T]{
@@ -49,6 +76,33 @@ func (s *Regexp[T]) stateListRepr(stateList []*State[T]) string {
 		labels[i] = ns.Repr0()
 	}
 	return fmt.Sprintf("[%s]", strings.Join(labels, ", "))
+}
+
+func (s *Regexp[T]) match2(start *State[T], input []T, from int) (bool, int) {
+
+	var clist, nlist []*State[T]
+	s.listid++
+	clist = s.addstate(clist, start)
+
+	for i := from; i < len(input); i++ {
+		ch := input[i]
+		fmt.Printf("Input #%d: %v: clist=%s nlist=%s\n",
+			i, ch, s.stateListRepr(clist),
+			s.stateListRepr(nlist))
+		nlist = s.step(clist, ch, nlist)
+		clist, nlist = nlist, clist
+		fmt.Printf("\tnew clist: %s\n", s.stateListRepr(clist))
+
+		if s.ismatch(clist) {
+			return true, i - from + 1
+		}
+	}
+	matched := s.ismatch(clist)
+	if matched {
+		return true, len(input)
+	} else {
+		return false, 0
+	}
 }
 
 func (s *Regexp[T]) match(start *State[T], input []T) bool {
@@ -89,8 +143,8 @@ func (s *Regexp[T]) addstate(l []*State[T], ns *State[T]) []*State[T] {
 func (s *Regexp[T]) step(clist []*State[T], ch T, nlist []*State[T]) []*State[T] {
 	s.listid++
 	nlist = nlist[:0]
-	fmt.Printf("step: nlist=%s\n", s.stateListRepr(nlist))
-	for i, ns := range clist {
+	//fmt.Printf("step: nlist=%s\n", s.stateListRepr(nlist))
+	for _, ns := range clist {
 		if ns.oClass == nil {
 			continue
 		}
@@ -99,7 +153,7 @@ func (s *Regexp[T]) step(clist []*State[T], ch T, nlist []*State[T]) []*State[T]
 		if ns.negation {
 			m = !m
 		}
-		fmt.Printf("step: clist %d %s => %v\n", i, ns.Repr0(), m)
+		//fmt.Printf("step: clist %d %s => %v\n", i, ns.Repr0(), m)
 		// TODO - how to record the output?
 		if m {
 			nlist = s.addstate(nlist, ns.out)
