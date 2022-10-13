@@ -68,23 +68,39 @@ type reParserState struct {
 	tokenChan chan tokenT
 	wg        sync.WaitGroup
 
-	insideClass   bool
-	classStartPos int
+	// Was a tError emitted?
+	emittedError bool
 
-	insideParen   bool
-	parenStartPos int
-	parenName     string
+	// The number of binary choices (alternations) that need to still be emitted
+	nbin int
 
-	firstAtomEmitted            bool
-	firstInsideParenAtomEmitted bool
+	// Number of atoms emitted that still need to be concatened with
+	natom int
 
-	alternationInProgress bool
+	// stack of pre-paren states, so that when a paren is closed,
+	// the previous state can be restored
+	p []backc
 
-	sawError bool
+	// The pos in p where the next stack entry can be placed.
+	j int
+}
+
+type backc struct {
+	nbin  int
+	natom int
 }
 
 func (s *reParserState) Initialize() {
 	s.tokenChan = make(chan tokenT)
+	s.p = make([]backc, 0)
+	s.ensure_stack_space()
+}
+
+func (s *reParserState) ensure_stack_space() {
+	if len(s.p) <= s.j+1 {
+		extra := s.j - len(s.p) + 1
+		s.p = append(s.p, make([]backc, extra)...)
+	}
 }
 
 func (s *reParserState) goparse() {
@@ -92,39 +108,211 @@ func (s *reParserState) goparse() {
 	defer s.wg.Done()
 	defer close(s.tokenChan)
 
-	// Start at the initial state, and get the next state,
-	// over and over again, entil we reach the final state
-	// (nil)
-	var state stateFunc
-	for state = s.stateNewAtom; state != nil; {
-		state = state()
-	}
+	for {
+		runePos := s.pos
+		// Get the next rune
+		ok, r, eof := s.getNextRune()
+		if !ok {
+			return
+		}
+		if eof {
+			break
+		}
 
-	if !s.sawError {
-		if s.alternationInProgress {
-			s.tokenChan <- tokenT{
-				ttype: tAlternate,
-			}
+		switch r {
+		case ' ', '\t', '\n':
+			continue
+
+		case '(':
+			s.parseLParen()
+
+		case '|':
+			s.parsePipe()
+
+		case ')':
+			s.parseRParen()
+
+		case '*', '+', '?':
+			s.parseGlob(r)
+
+		case '[':
+			s.parseLBracket(runePos)
+
+			//		case '.':
+
+		default:
+			s.emitErrorf("Syntax error at pos %d starting with '%c'", s.pos, r)
+			return
+		}
+
+		if s.emittedError {
+			return
 		}
 	}
 
-	// Are we in an incomplete state?
-	/*
-		if s.insideParen {
-			if s.parenName == "" {
-				s.emitErrorf("Objregexp finished before clsoing the opening paren at position %d",
-					s.groupStartPos)
-			} else {
-				s.emitErrorf("Objregexp finished before finishing group-list '%s' starting at position %d",
-					s.groupListName, s.groupListStartPos)
-			}
+	// If the stack of saved contexts is not empty, we have an error
+	if s.j != 0 {
+		s.emitUnexpectedEOF()
+	}
+	for s.natom--; s.natom > 0; s.natom-- {
+		s.emitConcatenation()
+	}
+	for ; s.nbin > 0; s.nbin-- {
+		s.emitAlternation()
+	}
+}
+
+func (s *reParserState) parseLParen() {
+	if s.natom > 1 {
+		s.natom--
+		s.emitConcatenation()
+	}
+	s.p[s.j].nbin = s.nbin
+	s.p[s.j].natom = s.natom
+	s.j++
+	s.ensure_stack_space()
+	s.nbin = 0
+	s.natom = 0
+}
+
+func (s *reParserState) parsePipe() {
+	if s.natom == 0 {
+		s.emitErrorf("'|' at pos %d is not allowed", s.pos)
+		return
+	}
+	for s.natom--; s.natom > 0; s.natom-- {
+		s.emitConcatenation()
+	}
+	s.nbin++
+}
+
+func (s *reParserState) parseRParen() {
+	if s.j == 0 || s.natom == 0 {
+		s.emitErrorf("Close paren ')' at pos %d doesn't follow an opening paren.", s.pos)
+		return
+	}
+	for s.natom--; s.natom > 0; s.natom-- {
+		s.emitConcatenation()
+	}
+	for ; s.nbin > 0; s.nbin-- {
+		s.emitAlternation()
+	}
+	s.j--
+	s.nbin = s.p[s.j].nbin
+	s.natom = s.p[s.j].natom
+	s.natom++
+}
+
+func (s *reParserState) parseGlob(r rune) {
+	switch r {
+	case '*':
+		s.tokenChan <- tokenT{
+			ttype: tGlobStar,
+			pos:   s.pos,
+		}
+	case '+':
+		s.tokenChan <- tokenT{
+			ttype: tGlobPlus,
+			pos:   s.pos,
+		}
+	case '?':
+		s.tokenChan <- tokenT{
+			ttype: tGlobQuestion,
+			pos:   s.pos,
+		}
+	default:
+		panic(fmt.Sprintf("Unexpected '%c' at pos %d", r, s.pos))
+	}
+}
+
+func (s *reParserState) parseLBracket(startPos int) {
+	ok, r, eof := s.getNextRune()
+	if eof {
+		s.emitUnexpectedEOF()
+		return
+	}
+	if !ok {
+		return
+	}
+
+	var negation bool
+	// We can start with a negation
+	if r == '!' {
+		negation = true
+		ok, r, eof = s.getNextRune()
+		if eof {
+			s.emitUnexpectedEOF()
+			return
+		}
+		if !ok {
+			return
+		}
+	}
+
+	// This must be a ':'
+	if r != ':' {
+		s.emitErrorf("Expected ':' to start a class name at pos %d", s.pos)
+		return
+	}
+
+	// Read rune names until the ending colon
+	nameRunes := make([]rune, 0, 20)
+
+	classPos := s.pos
+	for {
+		ok, r, eof := s.getNextRune()
+		if eof {
+			s.emitUnexpectedEOF()
+			return
+		}
+		if !ok {
+			return
+		}
+		if r == ' ' {
+			s.emitErrorf("The class name starting at pos %d has a space in it",
+				classPos)
+			return
 		}
 
-		if s.insideParen {
-			s.emitErrorf("Objregexp finished before finishing opening parentheis at position %d",
-				s.parenStartPos)
+		if !unicode.IsGraphic(r) {
+			s.emitErrorf("The class name starting at pos %d has a non-graphic Unicode code point in it",
+				classPos)
+			return
 		}
-	*/
+
+		if r == ':' {
+			break
+		}
+		nameRunes = append(nameRunes, r)
+	}
+
+	// We need a final ']'
+	ok, r, eof = s.getNextRune()
+	if eof {
+		s.emitUnexpectedEOF()
+		return
+	}
+	if !ok {
+		return
+	}
+
+	if r != ']' {
+		s.emitErrorf("Expected ] to end a class name at pos %d", s.pos)
+		return
+	}
+
+	if s.natom > 1 {
+		s.natom--
+		s.emitConcatenation()
+	}
+
+	s.tokenChan <- tokenT{
+		ttype:    tClass,
+		pos:      startPos,
+		name:     string(nameRunes),
+		negation: negation,
+	}
+	s.natom++
 }
 
 func (s *reParserState) emitConcatenation() {
@@ -134,6 +322,11 @@ func (s *reParserState) emitConcatenation() {
 		pos:   -1,
 	}
 }
+func (s *reParserState) emitAlternation() {
+	s.tokenChan <- tokenT{
+		ttype: tAlternate,
+	}
+}
 
 func (s *reParserState) emitErrorf(f string, args ...any) {
 	s.tokenChan <- tokenT{
@@ -141,7 +334,7 @@ func (s *reParserState) emitErrorf(f string, args ...any) {
 		pos:   s.pos,
 		err:   fmt.Errorf(f, args...),
 	}
-	s.sawError = true
+	s.emittedError = true
 }
 
 func (s *reParserState) emitRuneError() {
@@ -151,12 +344,14 @@ func (s *reParserState) emitUnexpectedEOF() {
 	s.emitErrorf("Unexpected end of string")
 }
 
-// a parser state is a function which returns the next parser state
-type stateFunc func() stateFunc
-
 // Return ok, rune, eof, and advances the pointer
+// If not ok, this function calls emitRuneError, via _peekNextRune
 func (s *reParserState) getNextRune() (bool, rune, bool) {
 	ok, r, size, eof := s._peekNextRune()
+	if !ok {
+		return false, 0, false
+	}
+
 	if ok && !eof {
 		s.pos += size
 	}
@@ -170,6 +365,7 @@ func (s *reParserState) peekNextRune() (bool, rune, bool) {
 }
 
 // Advances the pointer by 1 rune
+// If not ok, this function calls emitRuneError, via _peekNextRune
 func (s *reParserState) consumeNextRune() (bool, bool) {
 	ok, _, size, eof := s._peekNextRune()
 	if ok && !eof {
@@ -179,6 +375,7 @@ func (s *reParserState) consumeNextRune() (bool, bool) {
 }
 
 // Internal helper for get/peek/consume- NextRune()
+// If not ok, this function calls emitRuneErro
 func (s *reParserState) _peekNextRune() (bool, rune, int, bool) {
 	// EOS?
 	if s.pos == len(s.input) {
@@ -186,276 +383,8 @@ func (s *reParserState) _peekNextRune() (bool, rune, int, bool) {
 	}
 	r, size := utf8.DecodeRuneInString(s.input[s.pos:])
 	if r == utf8.RuneError {
+		s.emitRuneError()
 		return false, utf8.RuneError, size, false
 	}
 	return true, r, size, false
-}
-
-// At the beginning of a new item
-func (s *reParserState) stateNewAtom() stateFunc {
-	startPos := s.pos
-	ok, r, eof := s.getNextRune()
-	if eof {
-		return nil
-	}
-	if !ok {
-		s.emitRuneError()
-		return nil
-	}
-
-	// We can expect a new paren or group, or whitespace.
-
-	switch r {
-	case '(':
-		s.insideParen = true
-		s.firstInsideParenAtomEmitted = false
-		return s.stateInsideParenNewAtom
-	case '[':
-		s.insideClass = true
-		s.classStartPos = startPos
-		return s.stateClass
-	case '|':
-		// This cannot be the first thing
-		if !s.firstAtomEmitted {
-			s.emitErrorf("'|' cannot occur at pos %d", s.pos)
-			return nil
-		}
-		// This is alternation outside of a paren.
-		// We reset our knoweldge of having emitted anything
-		s.firstAtomEmitted = false
-		s.alternationInProgress = true
-		return s.stateNewAtom
-	case ' ':
-		return s.stateNewAtom
-	case '\n':
-		return s.stateNewAtom
-	case '\t':
-		return s.stateNewAtom
-	default:
-		s.emitErrorf("At position %d '%c' is illegal",
-			s.pos, r)
-		return nil
-	}
-}
-
-func (s *reParserState) stateClass() stateFunc {
-
-	ok, r, eof := s.getNextRune()
-	if eof {
-		s.emitUnexpectedEOF()
-		return nil
-	}
-	if !ok {
-		s.emitRuneError()
-		return nil
-	}
-
-	var negation bool
-	// We can start with a negation
-	if r == '!' {
-		negation = true
-		ok, r, eof = s.getNextRune()
-		if eof {
-			s.emitUnexpectedEOF()
-			return nil
-		}
-		if !ok {
-			s.emitRuneError()
-			return nil
-		}
-	}
-
-	// This must be a ':'
-	if r != ':' {
-		s.emitErrorf("Expected : to start a class name at pos %d", s.pos)
-		return nil
-	}
-
-	// Read rune names until the ending colon
-	nameRunes := make([]rune, 0, 20)
-
-	classPos := s.pos
-	for {
-		ok, r, eof := s.getNextRune()
-		if eof {
-			s.emitUnexpectedEOF()
-			return nil
-		}
-		if !ok {
-			s.emitRuneError()
-			return nil
-		}
-		if r == ' ' {
-			s.emitErrorf("The class name starting at pos %d has a space in it",
-				classPos)
-			return nil
-		}
-
-		if !unicode.IsGraphic(r) {
-			s.emitErrorf("The class name starting at pos %d has a non-graphic Unicode code point in it",
-				classPos)
-			return nil
-		}
-
-		if r == ':' {
-			break
-		}
-		nameRunes = append(nameRunes, r)
-	}
-
-	// We need a final ']'
-	ok, r, eof = s.getNextRune()
-	if eof {
-		s.emitUnexpectedEOF()
-		return nil
-	}
-	if !ok {
-		s.emitRuneError()
-		return nil
-	}
-
-	if r != ']' {
-		s.emitErrorf("Expected ] to end a class name at pos %d", s.pos)
-		return nil
-	}
-
-	s.tokenChan <- tokenT{
-		ttype:    tClass,
-		pos:      s.classStartPos,
-		name:     string(nameRunes),
-		negation: negation,
-	}
-
-	if s.insideParen {
-		return s.stateInsideParenAfterClass
-	} else {
-		return s.stateAfterClass
-	}
-}
-
-// After a class is emitted (outside of parens), we might see a count modifer
-func (s *reParserState) stateAfterClass() stateFunc {
-	ok, r, eof := s.peekNextRune()
-	if eof {
-		// It's okay to end the string here
-		// but if we do, ensure that a tConcat is emitted
-		// if needed.
-		if s.firstAtomEmitted {
-			s.emitConcatenation()
-		} else {
-			s.firstAtomEmitted = true
-		}
-		return nil
-	}
-	if !ok {
-		s.emitRuneError()
-		return nil
-	}
-	// At this point we can see a count modifier
-	switch r {
-	case '*':
-		_, _ = s.consumeNextRune()
-		s.tokenChan <- tokenT{
-			ttype: tGlobStar,
-			pos:   s.pos,
-		}
-	case '+':
-		_, _ = s.consumeNextRune()
-		s.tokenChan <- tokenT{
-			ttype: tGlobPlus,
-			pos:   s.pos,
-		}
-	case '?':
-		_, _ = s.consumeNextRune()
-		s.tokenChan <- tokenT{
-			ttype: tGlobQuestion,
-			pos:   s.pos,
-		}
-	default:
-		// no-op
-	}
-	if s.firstAtomEmitted {
-		s.emitConcatenation()
-	} else {
-		s.firstAtomEmitted = true
-	}
-	return s.stateNewAtom
-}
-
-func (s *reParserState) stateInsideParenNewAtom() stateFunc {
-	startPos := s.pos
-	ok, r, eof := s.getNextRune()
-	if eof {
-		s.emitUnexpectedEOF()
-		return nil
-	}
-	if !ok {
-		s.emitRuneError()
-		return nil
-	}
-
-	// We can expect a groups or whitespace, or closingparen
-
-	switch r {
-	case ')':
-		s.insideParen = false
-		s.firstInsideParenAtomEmitted = false
-		// Yes, we can return stateAfterClass here
-		return s.stateAfterClass
-	case '[':
-		s.insideClass = true
-		s.classStartPos = startPos
-		return s.stateClass
-	case ' ':
-		return s.stateInsideParenNewAtom
-	case '\n':
-		return s.stateInsideParenNewAtom
-	case '\t':
-		return s.stateInsideParenNewAtom
-	default:
-		s.emitErrorf("At position %d '%c' is illegal",
-			s.pos, r)
-		return nil
-	}
-}
-
-func (s *reParserState) stateInsideParenAfterClass() stateFunc {
-	ok, r, eof := s.peekNextRune()
-	if eof {
-		s.emitUnexpectedEOF()
-		return nil
-	}
-	if !ok {
-		s.emitRuneError()
-		return nil
-	}
-	// At this point we can see a count modifier
-	switch r {
-	case '*':
-		_, _ = s.consumeNextRune()
-		s.tokenChan <- tokenT{
-			ttype: tGlobStar,
-			pos:   s.pos,
-		}
-	case '+':
-		_, _ = s.consumeNextRune()
-		s.tokenChan <- tokenT{
-			ttype: tGlobPlus,
-			pos:   s.pos,
-		}
-	case '?':
-		_, _ = s.consumeNextRune()
-		s.tokenChan <- tokenT{
-			ttype: tGlobQuestion,
-			pos:   s.pos,
-		}
-	default:
-		// no-op
-	}
-	if s.firstInsideParenAtomEmitted {
-		s.emitConcatenation()
-	} else {
-		s.firstInsideParenAtomEmitted = true
-	}
-	return s.stateInsideParenNewAtom
 }

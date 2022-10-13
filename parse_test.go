@@ -42,6 +42,7 @@ func (s *MySuite) TestParser05(c *C) {
 	tokens, err := parseRegex(text)
 	c.Assert(err, IsNil)
 
+	//fmt.Printf("%+v\n", tokens)
 	c.Assert(len(tokens), Equals, 4)
 
 	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
@@ -147,4 +148,40 @@ func (s *MySuite) TestParser11(c *C) {
 
 	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
 	c.Check(tokens[4].ttype, Equals, tokenType(tAlternate))
+}
+
+func (s *MySuite) TestParser12(c *C) {
+	text := "[:foo:] | [:bar:] | [:baz:]"
+	tokens, err := parseRegex(text)
+	c.Assert(err, IsNil)
+
+	c.Assert(len(tokens), Equals, 5)
+
+	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].name, Equals, "foo")
+
+	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].name, Equals, "bar")
+
+	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[2].name, Equals, "baz")
+
+	c.Check(tokens[3].ttype, Equals, tokenType(tAlternate))
+	c.Check(tokens[4].ttype, Equals, tokenType(tAlternate))
+}
+
+func (s *MySuite) TestParser13(c *C) {
+	text := "( [:foo:] | [:bar:] )"
+	tokens, err := parseRegex(text)
+	c.Assert(err, IsNil)
+
+	c.Assert(len(tokens), Equals, 3)
+
+	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].name, Equals, "foo")
+
+	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].name, Equals, "bar")
+
+	c.Check(tokens[2].ttype, Equals, tokenType(tAlternate))
 }
