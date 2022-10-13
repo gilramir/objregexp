@@ -25,6 +25,7 @@ const (
 	tGlobStar               = "*" // *
 	tGlobPlus               = "+" // +
 	tGlobQuestion           = "?" // ?
+	tAny                    = "A" // .
 )
 
 type tokenT struct {
@@ -109,7 +110,6 @@ func (s *reParserState) goparse() {
 	defer close(s.tokenChan)
 
 	for {
-		runePos := s.pos
 		// Get the next rune
 		ok, r, eof := s.getNextRune()
 		if !ok {
@@ -136,9 +136,10 @@ func (s *reParserState) goparse() {
 			s.parseGlob(r)
 
 		case '[':
-			s.parseLBracket(runePos)
+			s.parseLBracket()
 
-			//		case '.':
+		case '.':
+			s.parseAny()
 
 		default:
 			s.emitErrorf("Syntax error at pos %d starting with '%c'", s.pos, r)
@@ -204,6 +205,12 @@ func (s *reParserState) parseRParen() {
 }
 
 func (s *reParserState) parseGlob(r rune) {
+	if s.natom == 0 {
+		s.emitErrorf("Cannot have glob '%c' at pos %d with no preceding item",
+			r, s.pos)
+		return
+	}
+
 	switch r {
 	case '*':
 		s.tokenChan <- tokenT{
@@ -225,7 +232,20 @@ func (s *reParserState) parseGlob(r rune) {
 	}
 }
 
-func (s *reParserState) parseLBracket(startPos int) {
+func (s *reParserState) parseAny() {
+	if s.natom > 1 {
+		s.natom--
+		s.emitConcatenation()
+	}
+	s.tokenChan <- tokenT{
+		ttype: tAny,
+		pos:   s.pos,
+	}
+
+	s.natom++
+}
+
+func (s *reParserState) parseLBracket() {
 	ok, r, eof := s.getNextRune()
 	if eof {
 		s.emitUnexpectedEOF()
@@ -308,7 +328,7 @@ func (s *reParserState) parseLBracket(startPos int) {
 
 	s.tokenChan <- tokenT{
 		ttype:    tClass,
-		pos:      startPos,
+		pos:      classPos,
 		name:     string(nameRunes),
 		negation: negation,
 	}

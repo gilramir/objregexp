@@ -27,22 +27,33 @@ func newReFactory[T comparable](compiler *Compiler[T]) *reFactory[T] {
 
 /*
  Represents an NFA state plus zero or one or two arrows exiting.
- if c == 0, it's something to match (Class), and only out is set
+ if c == nClass, it's something to match (Class), and only out is set
  if c == NMatch, no arrows out; matching state.
  If c == NSplit, unlabeled arrows to out and out1 (if != NULL).
 
 */
+type NodeT int
+
 const (
-	NMatch = iota + 1
+	NClass NodeT = iota
+	NMeta
+	NMatch
 	NSplit
 )
 
-type State[T comparable] struct {
-	c int
+type MetaT int
 
-	// oClass is set if c is 0
+const (
+	MTAny MetaT = iota + 1
+)
+
+type State[T comparable] struct {
+	c NodeT
+
+	// oClass or MetaT is set if c is 0
 	oClass   *Class[T]
 	negation bool
+	meta     MetaT
 
 	out, out1 *State[T]
 	lastlist  int
@@ -134,17 +145,20 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 
 	fmt.Printf("token2nfa: %+v\n", token)
 	switch token.ttype {
-	default:
-		e := fmt.Sprintf("token2nfa: %s not yet handled\n", string(token.ttype))
-		panic(e)
 
 	case tClass:
 		oclass, has := s.compiler.oclassMap[token.name]
 		if !has {
 			return fmt.Errorf("No such class name '%s' at pos %d", token.name, token.pos)
 		}
-		ns := State[T]{oClass: oclass, negation: token.negation,
+		ns := State[T]{c: NClass, oClass: oclass, negation: token.negation,
 			out: nil, out1: nil}
+		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
+		s.stp++
+		s.ensure_stack_space()
+
+	case tAny:
+		ns := State[T]{c: NMeta, meta: MTAny, out: nil, out1: nil}
 		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
@@ -201,84 +215,12 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
 
+	default:
+		e := fmt.Sprintf("token2nfa: %s not yet handled\n", string(token.ttype))
+		panic(e)
 	}
 	return nil
 }
-
-/*
-func (s *reFactory[T]) node2nfa(node *ParserTree[O]) {
-
-	switch node.item.NodeType() {
-	default:
-		e := fmt.Sprintf("node2nfa: %s not yet handled\n", NodeTypeName(node.item.NodeType()))
-		panic(e)
-
-	case OPIOClass:
-		ns := State[I, O]{io: node.item.(*IOClass[I, O]), out: nil, out1: nil}
-		s.stack[s.stp] = Frag[I, O]{&ns, []**State[I, O]{&ns.out}}
-		s.stp++
-		s.ensure_stack_space()
-
-	case OPAnd: // concatenate
-		if len(node.children) < 2 {
-			panic(fmt.Sprintf("%s has only %d children", node.Repr(), len(node.children)))
-		}
-
-		for i, ch := range node.children {
-			s.node2nfa(ch)
-			if i >= 1 {
-				s.stp--
-				e2 := s.stack[s.stp]
-				s.stp--
-				e1 := s.stack[s.stp]
-				// concatenate
-				s.patch(e1.out, e2.start)
-				s.stack[s.stp] = Frag[I, O]{e1.start, e2.out}
-				s.stp++
-				// No need to call ensure_stack_space here; we popped 2
-				// and added 1
-			}
-		}
-
-	case OPOr: // alternate
-		// Create entries in the stack for each child, and along the
-		// way, pair them with SPLIT nodes. Each SPLIT node can only
-		// have 2 outputs
-		if len(node.children) < 2 {
-			panic(fmt.Sprintf("%s has only %d children", node.Repr(), len(node.children)))
-		}
-		for i, ch := range node.children {
-			s.node2nfa(ch)
-			if i >= 1 {
-				s.stp--
-				e2 := s.stack[s.stp]
-				s.stp--
-				e1 := s.stack[s.stp]
-				ns := State[I, O]{c: NSplit, out: e1.start, out1: e2.start}
-				s.stack[s.stp] = Frag[I, O]{&ns, append(e1.out, e2.out...)}
-				s.stp++
-				// No need to call ensure_stack_space here; we popped 2
-				// and added 1
-			}
-		}
-	}
-}
-*/
-
-/*
-func (s *reFactory[T]) Parse(input []T) ([]O, error) {
-	fmt.Printf("Parsing %v\n", input)
-	o := make([]O, 0)
-
-	// Reset the state after any previous parse
-	s.nfa.RecursiveClearState()
-	s.listid = 0
-
-	m := s.match(s.nfa, input)
-	fmt.Printf("Matches: %v\n", m)
-	return o, nil
-}
-*/
 
 func (s *reFactory[T]) compile(text string) (*Regexp[T], error) {
 
@@ -313,7 +255,6 @@ func (s *reFactory[T]) compile(text string) (*Regexp[T], error) {
 	re := &Regexp[T]{}
 	re.matchstate.c = NMatch
 
-	fmt.Printf("patching\n")
 	s.patch(e.out, &re.matchstate)
 	re.nfa = e.start
 

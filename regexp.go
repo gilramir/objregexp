@@ -145,17 +145,25 @@ func (s *Regexp[T]) step(clist []*State[T], ch T, nlist []*State[T]) []*State[T]
 	nlist = nlist[:0]
 	//fmt.Printf("step: nlist=%s\n", s.stateListRepr(nlist))
 	for _, ns := range clist {
-		if ns.oClass == nil {
+		var matches bool
+		switch ns.c {
+		default:
 			continue
+		case NClass:
+			matches = ns.oClass.Matches(ch)
+			// Are we testing for non-memberhood?
+			if ns.negation {
+				matches = !matches
+			}
+		case NMeta:
+			switch ns.meta {
+			case MTAny:
+				matches = true
+			default:
+				panic(fmt.Sprintf("Unexpected meta '%v'", ns.meta))
+			}
 		}
-		m := ns.oClass.Matches(ch)
-		// Are we testing for non-memberhood?
-		if ns.negation {
-			m = !m
-		}
-		//fmt.Printf("step: clist %d %s => %v\n", i, ns.Repr0(), m)
-		// TODO - how to record the output?
-		if m {
+		if matches {
 			nlist = s.addstate(nlist, ns.out)
 		}
 	}
