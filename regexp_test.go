@@ -36,38 +36,32 @@ func (s *MySuite) TestRegexp01(c *C) {
 	c.Check(m.Range.End, Equals, 1)
 }
 
-// Test the "any" meta character (".")
-func (s *MySuite) TestRegexp02(c *C) {
+// Test Search
+func (s *MySuite) TestRegexp03(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(DigitClass)
+	compiler.RegisterClass(VowelClass)
 	compiler.Finalize()
 
-	re_vowel, err := compiler.Compile("[:digit:] . [:digit:]")
+	re_vowel, err := compiler.Compile("[:vowel:]")
 	c.Assert(err, IsNil)
 
-	input := []rune{'9', '0', '1'}
-	m := re_vowel.FullMatch(input)
-	c.Check(m.Success, Equals, true)
-
-	input = []rune{'9', 'A', '1'}
-	m = re_vowel.FullMatch(input)
-	c.Check(m.Success, Equals, true)
-
-	input = []rune{'9', 'X', '1'}
-	m = re_vowel.FullMatch(input)
-	c.Check(m.Success, Equals, true)
-
-	input = []rune{'9', 'X', 'Y'}
-	m = re_vowel.FullMatch(input)
+	input := []rune{'B', 'B'}
+	m := re_vowel.Match(input)
 	c.Check(m.Success, Equals, false)
 
-	input = []rune{'M', 'X', '1'}
-	m = re_vowel.FullMatch(input)
+	input = []rune{'B', 'B'}
+	m = re_vowel.Search(input)
 	c.Check(m.Success, Equals, false)
 
-	input = []rune{'M', 'X', 'Z'}
-	m = re_vowel.FullMatch(input)
+	input = []rune{'B', 'A'}
+	m = re_vowel.Match(input)
 	c.Check(m.Success, Equals, false)
+
+	input = []rune{'B', 'A'}
+	m = re_vowel.Search(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 1)
+	c.Check(m.Range.End, Equals, 2)
 }

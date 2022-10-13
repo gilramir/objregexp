@@ -301,3 +301,39 @@ func (s *MySuite) TestParen02(c *C) {
 	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }
+
+// Test the "any" meta character (".")
+func (s *MySuite) TestMetaAny(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+
+	compiler.RegisterClass(DigitClass)
+	compiler.Finalize()
+
+	re_vowel, err := compiler.Compile("[:digit:] . [:digit:]")
+	c.Assert(err, IsNil)
+
+	input := []rune{'9', '0', '1'}
+	m := re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'9', 'A', '1'}
+	m = re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'9', 'X', '1'}
+	m = re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'9', 'X', 'Y'}
+	m = re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'M', 'X', '1'}
+	m = re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'M', 'X', 'Z'}
+	m = re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, false)
+}

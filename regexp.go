@@ -25,51 +25,6 @@ type Match[T comparable] struct {
 	Group   map[string]Range
 }
 
-func (s *Regexp[T]) FullMatch(input []T) Match[T] {
-	s.listid = 0
-	s.nfa.RecursiveClearState()
-
-	vars := make(map[string]Range)
-	matched := s.match(s.nfa, input)
-	if matched {
-		return Match[T]{
-			Success: true,
-			Group:   vars,
-			Range: Range{
-				Start: 0,
-				End:   len(input),
-			},
-		}
-	} else {
-		return Match[T]{
-			Success: false,
-			Group:   make(map[string]Range),
-		}
-	}
-}
-func (s *Regexp[T]) Match(input []T) Match[T] {
-	s.listid = 0
-	s.nfa.RecursiveClearState()
-
-	vars := make(map[string]Range)
-	matched, n := s.match2(s.nfa, input, 0)
-	if matched {
-		return Match[T]{
-			Success: true,
-			Range: Range{
-				Start: 0,
-				End:   n,
-			},
-			Group: vars,
-		}
-	} else {
-		return Match[T]{
-			Success: false,
-			Group:   make(map[string]Range),
-		}
-	}
-}
-
 func (s *Regexp[T]) stateListRepr(stateList []*State[T]) string {
 	labels := make([]string, len(stateList))
 	for i, ns := range stateList {
@@ -178,4 +133,80 @@ func (s *Regexp[T]) ismatch(l []*State[T]) bool {
 		}
 	}
 	return false
+}
+
+func (s *Regexp[T]) FullMatch(input []T) Match[T] {
+	return s.FullMatchAt(input, 0)
+}
+
+func (s *Regexp[T]) FullMatchAt(input []T, start int) Match[T] {
+	s.listid = 0
+	s.nfa.RecursiveClearState()
+
+	vars := make(map[string]Range)
+	matched := s.match(s.nfa, input)
+	if matched {
+		return Match[T]{
+			Success: true,
+			Group:   vars,
+			Range: Range{
+				Start: start,
+				End:   len(input),
+			},
+		}
+	} else {
+		return Match[T]{
+			Success: false,
+			Group:   make(map[string]Range),
+		}
+	}
+}
+
+func (s *Regexp[T]) Match(input []T) Match[T] {
+	return s.MatchAt(input, 0)
+}
+
+func (s *Regexp[T]) MatchAt(input []T, start int) Match[T] {
+	s.listid = 0
+	s.nfa.RecursiveClearState()
+
+	vars := make(map[string]Range)
+	matched, n := s.match2(s.nfa, input, start)
+	if matched {
+		return Match[T]{
+			Success: true,
+			Range: Range{
+				Start: start,
+				End:   start + n,
+			},
+			Group: vars,
+		}
+	} else {
+		return Match[T]{
+			Success: false,
+			Group:   make(map[string]Range),
+		}
+	}
+}
+
+func (s *Regexp[T]) Search(input []T) Match[T] {
+	return s.SearchAt(input, 0)
+}
+
+func (s *Regexp[T]) SearchAt(input []T, start int) Match[T] {
+	// We could reduce the search by knowing the minimum sequence
+	// of matchable items in the regex. But we don't have a way
+	// to calculate that yet
+
+	for i := start; i < len(input); i++ {
+		m := s.MatchAt(input, i)
+		if m.Success {
+			return m
+		}
+	}
+
+	return Match[T]{
+		Success: false,
+		Group:   make(map[string]Range),
+	}
 }
