@@ -73,7 +73,7 @@ object classes;
     [:vowel:]*
 
     # Match one or zero vowel objects
-    ?
+    [:vowel:]?
 ---
 
 # Using objregexp
@@ -168,7 +168,8 @@ For example:
 
         m = regex.Match(objects)
         if m.Success {
+            range = m.Register(1)
             fmt.Println("The non-vowel group is at pos %d - %d",
-                m.Register(1).Start, m.Register(1).End)
+                range.Start, range.End)
         }
 ---

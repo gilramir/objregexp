@@ -48,7 +48,6 @@ func (s *MySuite) TestParser05(c *C) {
 	tokens, err := parseRegex(text)
 	c.Assert(err, IsNil)
 
-	//fmt.Printf("%+v\n", tokens)
 	c.Assert(len(tokens), Equals, 4)
 
 	c.Check(tokens[0].ttype, Equals, tokenType(tClass))

@@ -3,8 +3,6 @@
 package objregexp
 
 import (
-	"fmt"
-
 	. "gopkg.in/check.v1"
 )
 
@@ -18,7 +16,6 @@ var VowelClass = &Class[rune]{
 	func(r rune) bool {
 		for _, t := range vowels {
 			if r == t {
-				fmt.Printf("returning true\n")
 				return true
 			}
 		}

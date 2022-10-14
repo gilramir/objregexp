@@ -3,7 +3,6 @@
 package objregexp
 
 import (
-	"log"
 	"testing"
 
 	. "gopkg.in/check.v1"
@@ -11,7 +10,7 @@ import (
 
 // Hook up gocheck into the "go test" runner
 func Test(t *testing.T) {
-	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
+	//dlog.SetOutput(os.Stderr)
 	TestingT(t)
 }
 

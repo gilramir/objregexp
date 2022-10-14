@@ -58,20 +58,23 @@ const (
 	mtAny metaType = iota + 1
 )
 
-// Important - once a regex is compiled, nothing in State can change.
+// Important - once a regex is compiled, nothing in a stateT can change.
 // Otherwise, a single regex cannot be used in multiple concurrent goroutines
-// TODO - State -> stateT ; it doesn't need to be exported
 type stateT[T comparable] struct {
 	c nodeType
 
-	// oClass or MetaT is set if c is 0
+	// oClass is set if c is ntClass
 	oClass   *Class[T]
 	negation bool
-	meta     metaType
-	register int
+	// meta is set if c is ntMeta
+	meta metaType
+	//	register int
 
 	out, out1 *stateT[T]
 
+	// At this node, which registers start collecting
+	// (an open paren) and which ones stop collection
+	// (a closed paren)
 	startsRegisters []int
 	endsRegisters   []int
 }
@@ -167,7 +170,7 @@ func (s *nfaFactory[T]) ensure_stack_space() {
 
 func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 
-	fmt.Printf("token2nfa: %+v\n", token)
+	dlog.Printf("token2nfa: %+v", token)
 	switch token.ttype {
 
 	case tClass:
@@ -270,7 +273,7 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 	}
 
 	for _, token := range tokens {
-		fmt.Printf("token: %+v\n", token)
+		dlog.Printf("token: %+v", token)
 	}
 
 	// stp is where a new item will be placed in the stack.
@@ -301,7 +304,7 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 	re.nfa = e.start
 
 	// Dump it.
-	fmt.Printf("nfa:\n%s\n", re.nfa.Repr())
+	dlog.Printf("nfa:\n%s", re.nfa.Repr())
 
 	return re, nil
 }

@@ -52,7 +52,7 @@ type tokenT struct {
 
 func printTokens(tokens []tokenT) {
 	for i, t := range tokens {
-		fmt.Printf("#%d. %+v\n", i, t)
+		dlog.Printf("#%d. %+v", i, t)
 	}
 }
 
@@ -213,7 +213,7 @@ func (s *reParserState) parseLParen() {
 	s.p[s.j].nbin = s.nbin
 	s.p[s.j].natom = s.natom
 	s.p[s.j].beforeGroupNum = s.groupNumsAllocated
-	fmt.Printf("pstack %d => %+v\n", s.j, s.p[s.j])
+	dlog.Printf("pstack %d => %+v", s.j, s.p[s.j])
 	s.j++
 	s.ensure_stack_space()
 	s.nbin = 0

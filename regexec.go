@@ -132,21 +132,20 @@ func (s *executorT[T]) match(start *stateT[T], input []T, from int, full bool) (
 
 	for i := from; i < len(input); i++ {
 		ch := input[i]
-		fmt.Printf("Input #%d: %v: clist=%s nlist=%s\n",
+		dlog.Printf("Input #%d: %v: clist=%s nlist=%s",
 			i, ch, exStateListRepr(clist),
 			exStateListRepr(nlist))
 		nlist = s.step(i, clist, ch, nlist)
 		clist, nlist = nlist, clist
-		fmt.Printf("\tnew clist: %s\n", exStateListRepr(clist))
-		fmt.Printf("\n")
+		dlog.Printf("\tnew clist: %s", exStateListRepr(clist))
 
 		if !full {
 			if matched, xns := s.ismatch(clist); matched {
 				hit = hitT[T]{x: xns, length: i - from + 1}
-				fmt.Printf("MATCHED and stored hit %+v\n", hit)
-				//				return true, i - from + 1, xns
+				dlog.Printf("MATCHED and stored hit %+v", hit)
+				// keep going
 			} else {
-				fmt.Printf("NO MATCH and stored hit %+v\n", hit)
+				dlog.Printf("NO MATCH and stored hit %+v\n", hit)
 				if hit.x != nil {
 					// now we can return
 					return true, hit.length, hit.x
@@ -162,7 +161,7 @@ func (s *executorT[T]) match(start *stateT[T], input []T, from int, full bool) (
 			return false, 0, nil
 		}
 	} else {
-		fmt.Printf("FINISHED and stored hit %+v\n", hit)
+		dlog.Printf("FINISHED and stored hit %+v", hit)
 		if hit.x != nil {
 			// now we can return
 			return true, hit.length, hit.x
@@ -189,7 +188,6 @@ func (s *executorT[T]) addstate(l []*exStateT[T], ns *exStateT[T]) []*exStateT[T
 	// TODO - I'm not sure why we append ns here if ns == NSPlit. Is it
 	// necessary?
 	l = append(l, ns)
-	//	fmt.Printf("addstate: %s\n", exStateListRepr(l))
 	return l
 }
 
@@ -201,22 +199,22 @@ func (s *executorT[T]) addstate(l []*exStateT[T], ns *exStateT[T]) []*exStateT[T
 func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStateT[T]) []*exStateT[T] {
 	s.listid++
 	nlist = nlist[:0]
-	fmt.Printf("step @ %d: clist has %d : %s\n", pos, len(clist), exStateListRepr(clist))
+	dlog.Printf("step @ %d: clist has %d : %s", pos, len(clist), exStateListRepr(clist))
 	for ci, xns := range clist {
-		fmt.Printf("looking at clist #%d: %s\n", ci, xns.Repr0())
+		dlog.Printf("looking at clist #%d: %s", ci, xns.Repr0())
 		ns := xns.st
 		var matches bool
 		switch ns.c {
 		default:
-			fmt.Printf("<skipping>\n")
+			dlog.Printf("<skipping>")
 			continue
 		case ntClass:
 			matches = ns.oClass.Matches(ch)
-			fmt.Printf("Matches class %s: %v\n", ns.oClass.Name, matches)
+			dlog.Printf("Matches class %s: %v", ns.oClass.Name, matches)
 			// Are we testing for non-memberhood?
 			if ns.negation {
 				matches = !matches
-				fmt.Printf("Negation -> %v\n", matches)
+				dlog.Printf("Negation -> %v", matches)
 			}
 		case ntMeta:
 			switch ns.meta {
@@ -239,14 +237,13 @@ func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStat
 				xns.registers.ranges[rn-1].End = pos + 1
 			}
 
-			fmt.Printf("match; calling addstate()\n")
+			dlog.Printf("match; calling addstate()")
 			// Copy the previous registers
 			xns.out.registers = xns.registers.Copy()
-			fmt.Printf("new registers: %+v\n", xns.out.registers.ranges)
+			dlog.Printf("new registers: %+v", xns.out.registers.ranges)
 			nlist = s.addstate(nlist, xns.out)
 		}
 	}
-	//	fmt.Printf("step: nlist=%s\n", exStateListRepr(nlist))
 	return nlist
 }
 
@@ -254,7 +251,7 @@ func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStat
 func (s *executorT[T]) ismatch(l []*exStateT[T]) (bool, *exStateT[T]) {
 	for _, ns := range l {
 		if ns == s.matchstate {
-			fmt.Printf("registers: %+v\n", ns.registers.ranges)
+			dlog.Printf("matched; registers: %+v", ns.registers.ranges)
 			return true, ns
 		}
 	}

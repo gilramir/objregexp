@@ -2,7 +2,29 @@
 
 package objregexp
 
-import "fmt"
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+)
+
+// The debug logger for this module. By default, output is discarded.
+var dlog *log.Logger
+
+func init() {
+	dlog = log.New(ioutil.Discard, "[DEBUG] ", log.Ldate|log.Lmicroseconds|log.Lshortfile)
+}
+
+// Change the debug logger object in this module
+func SetDebugLogger(logger *log.Logger) {
+	dlog = logger
+}
+
+// Returns the output of the current debug logger in this module.
+// You can then call SetOutput on the object, for example.
+func GetDebugLoggerOutput() *log.Logger {
+	return dlog
+}
 
 type Compiler[T comparable] struct {
 	finalized bool
