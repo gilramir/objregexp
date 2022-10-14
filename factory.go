@@ -16,6 +16,9 @@ type reFactory[T comparable] struct {
 	// stack pointer, and stack, while buildind the NFA stack (regexp)
 	stp   int
 	stack []Frag[T]
+
+	// how many registers are addressed by this regex
+	numRegisters int
 }
 
 func newReFactory[T comparable](compiler *Compiler[T]) *reFactory[T] {
@@ -44,9 +47,13 @@ const (
 type MetaT int
 
 const (
+	// An unitialized MetaT will be 0 but with no enum name
 	MTAny MetaT = iota + 1
 )
 
+// Important - once a regex is compiled, nothing in State can change.
+// Otherwise, a single regex cannot be used in multiple concurrent goroutines
+// TODO - State -> stateT ; it doesn't need to be exported
 type State[T comparable] struct {
 	c NodeT
 
@@ -54,25 +61,49 @@ type State[T comparable] struct {
 	oClass   *Class[T]
 	negation bool
 	meta     MetaT
+	register int
 
 	out, out1 *State[T]
-	lastlist  int
+
+	startsRegisters []int
+	endsRegisters   []int
+}
+
+func stateListRepr[T comparable](stateList []*State[T]) string {
+	labels := make([]string, len(stateList))
+	for i, ns := range stateList {
+		labels[i] = ns.Repr0()
+	}
+	return fmt.Sprintf("[%s]", strings.Join(labels, ", "))
 }
 
 func (s *State[T]) Repr0() string {
 	var label string
-	if s.c == NMatch {
+	switch s.c {
+	case NMatch:
 		label = "MATCH"
-	} else if s.c == NSplit {
+	case NSplit:
 		label = "SPLIT"
-	} else {
+	case NMeta:
+		switch s.meta {
+		case MTAny:
+			label = "ANY"
+		default:
+			label = "MT?"
+		}
+	default:
 		if s.oClass != nil {
-			label = s.oClass.Name
+			if s.negation {
+				label = "!" + s.oClass.Name
+			} else {
+				label = s.oClass.Name
+			}
 		} else {
 			label = "?"
 		}
 	}
-	return fmt.Sprintf("<State %s lastlist=%d>", label, s.lastlist)
+	return fmt.Sprintf("<State %s sr:%v er:%v>", label,
+		s.startsRegisters, s.endsRegisters)
 }
 
 func (s *State[T]) Repr() string {
@@ -81,7 +112,10 @@ func (s *State[T]) Repr() string {
 }
 
 func (s *State[T]) ReprN(n int, saw map[*State[T]]bool) string {
-	saw[s] = true
+	// Don't record MATCH as seen; we always want to display it
+	if s.c != NMatch {
+		saw[s] = true
+	}
 	indent := strings.Repeat("  ", n)
 	txt := fmt.Sprintf("%s%s", indent, s.Repr0())
 	if s.out != nil && !saw[s.out] {
@@ -91,23 +125,6 @@ func (s *State[T]) ReprN(n int, saw map[*State[T]]bool) string {
 		txt += "\n" + s.out1.ReprN(n+1, saw)
 	}
 	return txt
-}
-
-// Won't need this
-func (s *State[T]) RecursiveClearState() {
-	saw := make(map[*State[T]]bool)
-	s._recursiveClearState(saw)
-}
-
-func (s *State[T]) _recursiveClearState(saw map[*State[T]]bool) {
-	saw[s] = true
-	s.lastlist = 0
-	if s.out != nil && !saw[s.out] {
-		s.out._recursiveClearState(saw)
-	}
-	if s.out1 != nil && !saw[s.out1] {
-		s.out1._recursiveClearState(saw)
-	}
 }
 
 type Frag[T comparable] struct {
@@ -153,12 +170,6 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 		}
 		ns := State[T]{c: NClass, oClass: oclass, negation: token.negation,
 			out: nil, out1: nil}
-		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
-		s.stp++
-		s.ensure_stack_space()
-
-	case tAny:
-		ns := State[T]{c: NMeta, meta: MTAny, out: nil, out1: nil}
 		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
@@ -215,6 +226,28 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
 
+	case tAny:
+		ns := State[T]{c: NMeta, meta: MTAny, out: nil, out1: nil}
+		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
+		s.stp++
+		s.ensure_stack_space()
+
+	case tStartRegister:
+		ns := s.stack[s.stp-1].start
+		ns.startsRegisters = append(ns.startsRegisters, token.int1)
+		if token.int1 > s.numRegisters {
+			s.numRegisters = token.int1
+		}
+
+	case tEndRegister:
+		ns := s.stack[s.stp-1].start
+		if ns.c == NSplit {
+			ns.out.endsRegisters = append(ns.out.endsRegisters, token.int1)
+			ns.out1.endsRegisters = append(ns.out1.endsRegisters, token.int1)
+		} else {
+			ns.endsRegisters = append(ns.endsRegisters, token.int1)
+		}
+
 	default:
 		e := fmt.Sprintf("token2nfa: %s not yet handled\n", string(token.ttype))
 		panic(e)
@@ -252,7 +285,9 @@ func (s *reFactory[T]) compile(text string) (*Regexp[T], error) {
 		panic(fmt.Sprintf("compile failed: stp=%d e=%s", s.stp,
 			e.Repr()))
 	}
-	re := &Regexp[T]{}
+	re := &Regexp[T]{
+		numRegisters: s.numRegisters,
+	}
 	re.matchstate.c = NMatch
 
 	s.patch(e.out, &re.matchstate)

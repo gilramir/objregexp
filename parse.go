@@ -18,28 +18,40 @@ type tokenType string
 
 // The token types
 const (
-	tError        tokenType = "E"
-	tClass                  = "C" // [:alpha:]
-	tConcat                 = "." // concatenate, for internal postfix notation
-	tAlternate              = "|" // alternate choices
-	tGlobStar               = "*" // *
-	tGlobPlus               = "+" // +
-	tGlobQuestion           = "?" // ?
-	tAny                    = "A" // .
+	tError         tokenType = "E"
+	tClass                   = "C" // [:alpha:]
+	tConcat                  = "." // concatenate, for internal postfix notation
+	tAlternate               = "|" // alternate choices
+	tGlobStar                = "*" // *
+	tGlobPlus                = "+" // +
+	tGlobQuestion            = "?" // ?
+	tAny                     = "A" // .
+	tStartRegister           = "(" // Record info about the open paren
+	tEndRegister             = ")" // Record info about the close paren
 )
 
 type tokenT struct {
 	ttype tokenType
 	pos   int
-	value string
+	//value string
 
-	name     string
+	// For tClass, name is the name of the class
+	name string
+
+	// negation is only used For tClass
 	negation bool
 
+	// For tStartReg and tEndReg, int1 holds the register number
 	int1 int
-	int2 int
+	//int2 int
 
 	err error
+}
+
+func printTokens(tokens []tokenT) {
+	for i, t := range tokens {
+		fmt.Printf("#%d. %+v\n", i, t)
+	}
 }
 
 func parseRegex(restring string) ([]tokenT, error) {
@@ -53,6 +65,10 @@ func parseRegex(restring string) ([]tokenT, error) {
 	for token := range pstate.tokenChan {
 		switch token.ttype {
 		case tError:
+			// There better not be any tokens being written
+			// to the channel, and thereby not closing the
+			// channel, and leaving the goroutine still running,
+			// otherwise we'll be waiting here forever.
 			pstate.wg.Wait()
 			return nil, token.err
 		default:
@@ -68,6 +84,8 @@ type reParserState struct {
 	pos       int
 	tokenChan chan tokenT
 	wg        sync.WaitGroup
+
+	groupNumsAllocated int
 
 	// Was a tError emitted?
 	emittedError bool
@@ -87,8 +105,9 @@ type reParserState struct {
 }
 
 type backc struct {
-	nbin  int
-	natom int
+	nbin           int
+	natom          int
+	beforeGroupNum int
 }
 
 func (s *reParserState) Initialize() {
@@ -154,26 +173,50 @@ func (s *reParserState) goparse() {
 	// If the stack of saved contexts is not empty, we have an error
 	if s.j != 0 {
 		s.emitUnexpectedEOF()
+		return
 	}
+
 	for s.natom--; s.natom > 0; s.natom-- {
 		s.emitConcatenation()
 	}
+
 	for ; s.nbin > 0; s.nbin-- {
 		s.emitAlternation()
 	}
 }
 
 func (s *reParserState) parseLParen() {
+
+	// First emit the tStartRegister
+	/*
+		if s.natom > 1 {
+			s.natom--
+			s.emitConcatenation()
+		}
+	*/
+	s.groupNumsAllocated++
+	s.tokenChan <- tokenT{
+		ttype: tStartRegister,
+		pos:   s.pos,
+		int1:  s.groupNumsAllocated,
+	}
+	//	s.natom++
+
+	// Then do the regular LParen logic
 	if s.natom > 1 {
 		s.natom--
 		s.emitConcatenation()
 	}
+
 	s.p[s.j].nbin = s.nbin
 	s.p[s.j].natom = s.natom
+	s.p[s.j].beforeGroupNum = s.groupNumsAllocated
+	fmt.Printf("pstack %d => %+v\n", s.j, s.p[s.j])
 	s.j++
 	s.ensure_stack_space()
 	s.nbin = 0
 	s.natom = 0
+
 }
 
 func (s *reParserState) parsePipe() {
@@ -188,6 +231,7 @@ func (s *reParserState) parsePipe() {
 }
 
 func (s *reParserState) parseRParen() {
+	// First emit the regular RParen stuff
 	if s.j == 0 || s.natom == 0 {
 		s.emitErrorf("Close paren ')' at pos %d doesn't follow an opening paren.", s.pos)
 		return
@@ -202,6 +246,20 @@ func (s *reParserState) parseRParen() {
 	s.nbin = s.p[s.j].nbin
 	s.natom = s.p[s.j].natom
 	s.natom++
+
+	// Now emit the tEndRegister
+	/*
+		if s.natom > 1 {
+			s.natom--
+			s.emitConcatenation()
+		}
+	*/
+	s.tokenChan <- tokenT{
+		ttype: tEndRegister,
+		pos:   s.pos,
+		int1:  s.p[s.j].beforeGroupNum,
+	}
+	//	s.natom++
 }
 
 func (s *reParserState) parseGlob(r rune) {
@@ -241,7 +299,6 @@ func (s *reParserState) parseAny() {
 		ttype: tAny,
 		pos:   s.pos,
 	}
-
 	s.natom++
 }
 

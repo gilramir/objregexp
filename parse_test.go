@@ -99,19 +99,23 @@ func (s *MySuite) TestParser09(c *C) {
 	tokens, err := parseRegex(text)
 	c.Assert(err, IsNil)
 
-	c.Assert(len(tokens), Equals, 5)
+	printTokens(tokens)
+	c.Assert(len(tokens), Equals, 7)
 
 	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
-	c.Check(tokens[1].name, Equals, "alpha")
+	c.Check(tokens[1].ttype, Equals, tokenType(tStartRegister))
 
 	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
-	c.Check(tokens[2].name, Equals, "bar")
+	c.Check(tokens[2].name, Equals, "alpha")
 
-	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
+	c.Check(tokens[3].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[3].name, Equals, "bar")
+
 	c.Check(tokens[4].ttype, Equals, tokenType(tConcat))
+	c.Check(tokens[5].ttype, Equals, tokenType(tEndRegister))
+	c.Check(tokens[6].ttype, Equals, tokenType(tConcat))
 }
 
 func (s *MySuite) TestParser10(c *C) {
@@ -175,13 +179,52 @@ func (s *MySuite) TestParser13(c *C) {
 	tokens, err := parseRegex(text)
 	c.Assert(err, IsNil)
 
-	c.Assert(len(tokens), Equals, 3)
+	c.Assert(len(tokens), Equals, 5)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
-	c.Check(tokens[0].name, Equals, "foo")
+	c.Check(tokens[0].ttype, Equals, tokenType(tStartRegister))
 
 	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
-	c.Check(tokens[1].name, Equals, "bar")
+	c.Check(tokens[1].name, Equals, "foo")
 
-	c.Check(tokens[2].ttype, Equals, tokenType(tAlternate))
+	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[2].name, Equals, "bar")
+
+	c.Check(tokens[3].ttype, Equals, tokenType(tAlternate))
+
+	c.Check(tokens[4].ttype, Equals, tokenType(tEndRegister))
+}
+
+// Nested parens
+func (s *MySuite) TestParser14(c *C) {
+	// infloop text := "[:a:] ( [:b:] ( [:c:] | [:d:] )?"
+	text := "[:a:] ( [:b:] ( [:c:] | [:d:] ) )?"
+	tokens, err := parseRegex(text)
+	c.Assert(err, IsNil)
+
+	printTokens(tokens)
+	//  abcd|.?.
+	/*
+		c.Assert(len(tokens), Equals, 5)
+
+		c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+		c.Check(tokens[0].name, Equals, "foo")
+
+		c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+		c.Check(tokens[1].name, Equals, "alpha")
+
+		c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+		c.Check(tokens[2].name, Equals, "bar")
+
+		c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
+		c.Check(tokens[4].ttype, Equals, tokenType(tConcat))
+	*/
+}
+
+// Imbalanced nested parens which at one point caused an
+// infinite loop in the logic
+func (s *MySuite) TestParser15(c *C) {
+	text := "[:a:] ( [:b:] ( [:c:] | [:d:] )?"
+	_, err := parseRegex(text)
+	c.Assert(err, NotNil)
+	c.Assert(err.Error(), Equals, "Unexpected end of string")
 }
