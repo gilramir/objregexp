@@ -1,4 +1,4 @@
-= Introduction
+# Introduction
 Regular expressions are convenient mechanisms for doing some types of parsing
 of strings. But what if you aren't analyzing string?
 "Object" regular expressions are a way to use regular
@@ -39,7 +39,7 @@ In this syntax:
 * Whitespace has no meaning and can be used liberally throughout
         your reggex to make it more readable.
 
-= Examples
+# Examples
 
 Here are some sample regexes, assuming that "vowel" and "consonant" are
 object classes;
@@ -75,9 +75,9 @@ object classes;
     ?
 ---
 
-= Using objregexp
+# Using objregexp
 
-== Instantiate the Compiler
+## Instantiate the Compiler
 
 First instantiate a Compiler object. The Compiler object
 will hold the object classes you define.
@@ -86,7 +86,6 @@ In this example, the object type we consider is a rune, but
 it can be any object type which satisfies the "comparable" constraint.
 
 ---
-
 import (
         "github.com/gilramir/objregexp"
 )
@@ -112,24 +111,21 @@ func main() {
 	compiler.RegisterClass(VowelClass)
 	compiler.Finalize()
 }
-
 ---
 
 
-== Compile the Regexp
+## Compile the Regexp
 
 Once you have defined
 all your object classes, use the Compiler object to compile
 regular expressions into Regexp objects.
 
 ---
-
         pattern = "[:vowel:]*"
         regex, err := compiler.Compile(pattern)
-
 ---
 
-== Use the Regexp on a slice of objects
+## Use the Regexp on a slice of objects
 
 ---
         objects := []rune{ 'A', 'E', 'I' }
@@ -150,7 +146,7 @@ the regular expression on a slice of objects:
 * Search - Find the first match, starting at any index
 * SearchAt - Find the first match, starting at a specific index
 
-== The Match object
+## The Match object
 
 The Match object not only tells you if the regex succesfully
 matched, but it gives you the index position of the start and
