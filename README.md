@@ -86,31 +86,31 @@ In this example, the object type we consider is a rune, but
 it can be any object type which satisfies the "comparable" constraint.
 
 ---
-import (
-        "github.com/gilramir/objregexp"
-)
+    import (
+            "github.com/gilramir/objregexp"
+    )
 
-var vowels = []rune{'A', 'E', 'I', 'O', 'U'}
+    var vowels = []rune{'A', 'E', 'I', 'O', 'U'}
 
-var VowelClass = &Class[rune]{
-	"vowel",
-	func(r rune) bool {
-		for _, t := range vowels {
-			if r == t {
-				fmt.Printf("returning true\n")
-				return true
-			}
-		}
-		return false
-	},
-}
+    var VowelClass = &Class[rune]{
+            "vowel",
+            func(r rune) bool {
+                    for _, t := range vowels {
+                            if r == t {
+                                    fmt.Printf("returning true\n")
+                                    return true
+                            }
+                    }
+                    return false
+            },
+    }
 
 
-func main() {
-        rc := Compiler[MyType]()
-	compiler.RegisterClass(VowelClass)
-	compiler.Finalize()
-}
+    func main() {
+            rc := Compiler[MyType]()
+            compiler.RegisterClass(VowelClass)
+            compiler.Finalize()
+    }
 ---
 
 
@@ -139,12 +139,12 @@ regular expressions into Regexp objects.
 The Regexp class has a few different methods for trying
 the regular expression on a slice of objects:
 
-* Match - Find the first sub-slice that matches
-* MatchAt - Like above, but starting at a specific index
-* FullMatch - Check if the regex match the entire slice
-* FullMatchAt - Like above, but starting at a specific index
-* Search - Find the first match, starting at any index
-* SearchAt - Find the first match, starting at a specific index
+* *Match* - Find the first sub-slice that matches
+* *MatchAt* - Like above, but starting at a specific index
+* *FullMatch* - Check if the regex match the entire slice
+* *FullMatchAt* - Like above, but starting at a specific index
+* *Search* - Find the first match, starting at any index
+* *SearchAt* - Find the first match, starting at a specific index
 
 ## The Match object
 
