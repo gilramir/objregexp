@@ -1,11 +1,13 @@
+// Copyright 2022 by Gilbert Ramirez <gram@alumni.rice.edu>
+
 package objregexp
 
 type Regexp[T comparable] struct {
 	// the root node of the stack; where the parse begins
-	nfa *State[T]
+	nfa *stateT[T]
 
 	// singleton matching state used to denote all end states
-	matchstate State[T]
+	matchstate stateT[T]
 
 	// How many registers can be saved to by this regex
 	numRegisters int

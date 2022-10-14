@@ -1,3 +1,5 @@
+// Copyright 2022 by Gilbert Ramirez <gram@alumni.rice.edu>
+
 package objregexp
 
 import (
@@ -14,7 +16,7 @@ type executorT[T comparable] struct {
 
 	// Every State should have only 1 copy as an exState, so we need this
 	// cache
-	stCache map[*State[T]]*exStateT[T]
+	stCache map[*stateT[T]]*exStateT[T]
 
 	matchstate *exStateT[T]
 }
@@ -23,14 +25,14 @@ type executorT[T comparable] struct {
 func (s *executorT[T]) Initialize(regex *Regexp[T]) {
 	s.regex = regex
 	s.listid = 0
-	s.stCache = make(map[*State[T]]*exStateT[T])
+	s.stCache = make(map[*stateT[T]]*exStateT[T])
 	s.matchstate = s.exState(&regex.matchstate)
 }
 
 // This mirrors a state object, but it's modifiable so that the same
 // Regexp object (State) can be used in multiple concrent goroutines
 type exStateT[T comparable] struct {
-	st *State[T]
+	st *stateT[T]
 
 	// for the nfa
 	lastlist int
@@ -58,12 +60,12 @@ func (s *registersT) Copy() *registersT {
 	return r
 }
 
-func (s *executorT[T]) exStateRecursive(state *State[T]) *exStateT[T] {
+func (s *executorT[T]) exStateRecursive(state *stateT[T]) *exStateT[T] {
 
 	return s.exState(state)
 }
 
-func (s *executorT[T]) exState(state *State[T]) *exStateT[T] {
+func (s *executorT[T]) exState(state *stateT[T]) *exStateT[T] {
 	if state == nil {
 		return nil
 	}
@@ -111,7 +113,7 @@ func exStateListRepr[T comparable](exStateList []*exStateT[T]) string {
 // Walk the list of states, which can expand into branches.
 // If full is true, wait until the end of the string to check for a final match
 // If full is false, return true as soon as a match is found
-func (s *executorT[T]) match(start *State[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
+func (s *executorT[T]) match(start *stateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
 
 	xstart := s.exStateRecursive(start)
 
@@ -155,7 +157,7 @@ func (s *executorT[T]) addstate(l []*exStateT[T], ns *exStateT[T]) []*exStateT[T
 		return l
 	}
 	ns.lastlist = s.listid
-	if ns.st.c == NSplit {
+	if ns.st.c == ntSplit {
 		fmt.Sprintf("Split %s -> %s and %s\n", ns.Repr0(), ns.out.Repr0(), ns.out1.Repr0())
 		ns.out.registers = ns.registers.Copy()
 		ns.out1.registers = ns.registers.Copy()
@@ -186,7 +188,7 @@ func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStat
 		default:
 			fmt.Printf("<skipping>\n")
 			continue
-		case NClass:
+		case ntClass:
 			matches = ns.oClass.Matches(ch)
 			fmt.Printf("Matches class %s: %v\n", ns.oClass.Name, matches)
 			// Are we testing for non-memberhood?
@@ -194,9 +196,9 @@ func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStat
 				matches = !matches
 				fmt.Printf("Negation -> %v\n", matches)
 			}
-		case NMeta:
+		case ntMeta:
 			switch ns.meta {
-			case MTAny:
+			case mtAny:
 				matches = true
 
 			default:

@@ -1,3 +1,5 @@
+// Copyright 2022 by Gilbert Ramirez <gram@alumni.rice.edu>
+
 package objregexp
 
 import (
@@ -345,13 +347,10 @@ func (s *reParserState) parseLBracket() {
 		if !ok {
 			return
 		}
-		if r == ' ' {
-			s.emitErrorf("The class name starting at pos %d has a space in it",
-				classPos)
-			return
-		}
 
-		if !unicode.IsGraphic(r) {
+		// Allow anything except non-visible code point glyphs.
+		// But do allow spaces
+		if !unicode.IsGraphic(r) && r != ' ' {
 			s.emitErrorf("The class name starting at pos %d has a non-graphic Unicode code point in it",
 				classPos)
 			return

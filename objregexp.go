@@ -1,13 +1,17 @@
+// Copyright 2022 by Gilbert Ramirez <gram@alumni.rice.edu>
+
 package objregexp
 
 import "fmt"
 
 type Compiler[T comparable] struct {
-	finalized    bool
-	namespace    map[string]ccType
-	oclassMap    map[string]*Class[T]
-	exemplarObj  map[string]T
-	exemplarName map[T]string
+	finalized bool
+	namespace map[string]ccType
+	classMap  map[string]*Class[T]
+	/*
+		exemplarObj  map[string]T
+		exemplarName map[T]string
+	*/
 }
 
 type ccType int
@@ -27,9 +31,11 @@ func (s *Compiler[T]) Initialize() {
 	s.assertNotFinalized()
 
 	s.namespace = make(map[string]ccType)
-	s.oclassMap = make(map[string]*Class[T])
-	s.exemplarObj = make(map[string]T)
-	s.exemplarName = make(map[T]string)
+	s.classMap = make(map[string]*Class[T])
+	/*
+		s.exemplarObj = make(map[string]T)
+		s.exemplarName = make(map[T]string)
+	*/
 }
 
 func (s *Compiler[T]) assertFinalized() {
@@ -61,13 +67,13 @@ func (s *Compiler[T]) RegisterClass(oClass *Class[T]) {
 		}
 		panic(msg)
 	}
-	s.oclassMap[oClass.Name] = oClass
+	s.classMap[oClass.Name] = oClass
 	s.namespace[oClass.Name] = ccClass
 }
 
 func (s *Compiler[T]) Compile(text string) (*Regexp[T], error) {
 	s.assertFinalized()
 
-	factory := newReFactory[T](s)
+	factory := newNfaFactory[T](s)
 	return factory.compile(text)
 }

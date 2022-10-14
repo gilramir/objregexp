@@ -1,3 +1,5 @@
+// Copyright 2022 by Gilbert Ramirez <gram@alumni.rice.edu>
+
 package objregexp
 
 import (
@@ -5,12 +7,17 @@ import (
 	"strings"
 )
 
+// Made by starting with these sources, and modifying:
 // https://medium.com/@phanindramoganti/regex-under-the-hood-implementing-a-simple-regex-compiler-in-go-ef2af5c6079
 // https://github.com/phanix5/Simple-Regex-Complier-in-Go/blob/master/regex.go
+
+// With more info at:
 // https://www.oilshell.org/archive/Thompson-1968.pdf
 // https://swtch.com/~rsc/regexp/regexp1.html
 
-type reFactory[T comparable] struct {
+// The state needed to convert a stream of tokenT's into a Regexp with
+// an nfa in it.
+type nfaFactory[T comparable] struct {
 	compiler *Compiler[T]
 
 	// stack pointer, and stack, while buildind the NFA stack (regexp)
@@ -21,8 +28,8 @@ type reFactory[T comparable] struct {
 	numRegisters int
 }
 
-func newReFactory[T comparable](compiler *Compiler[T]) *reFactory[T] {
-	return &reFactory[T]{
+func newNfaFactory[T comparable](compiler *Compiler[T]) *nfaFactory[T] {
+	return &nfaFactory[T]{
 		compiler: compiler,
 		stack:    make([]Frag[T], 0),
 	}
@@ -31,45 +38,45 @@ func newReFactory[T comparable](compiler *Compiler[T]) *reFactory[T] {
 /*
  Represents an NFA state plus zero or one or two arrows exiting.
  if c == nClass, it's something to match (Class), and only out is set
- if c == NMatch, no arrows out; matching state.
- If c == NSplit, unlabeled arrows to out and out1 (if != NULL).
+ if c == ntMatch, no arrows out; matching state.
+ If c == ntSplit, unlabeled arrows to out and out1 (if != NULL).
 
 */
-type NodeT int
+type nodeType int
 
 const (
-	NClass NodeT = iota
-	NMeta
-	NMatch
-	NSplit
+	ntClass nodeType = iota
+	ntMeta
+	ntMatch
+	ntSplit
 )
 
-type MetaT int
+type metaType int
 
 const (
 	// An unitialized MetaT will be 0 but with no enum name
-	MTAny MetaT = iota + 1
+	mtAny metaType = iota + 1
 )
 
 // Important - once a regex is compiled, nothing in State can change.
 // Otherwise, a single regex cannot be used in multiple concurrent goroutines
 // TODO - State -> stateT ; it doesn't need to be exported
-type State[T comparable] struct {
-	c NodeT
+type stateT[T comparable] struct {
+	c nodeType
 
 	// oClass or MetaT is set if c is 0
 	oClass   *Class[T]
 	negation bool
-	meta     MetaT
+	meta     metaType
 	register int
 
-	out, out1 *State[T]
+	out, out1 *stateT[T]
 
 	startsRegisters []int
 	endsRegisters   []int
 }
 
-func stateListRepr[T comparable](stateList []*State[T]) string {
+func stateListRepr[T comparable](stateList []*stateT[T]) string {
 	labels := make([]string, len(stateList))
 	for i, ns := range stateList {
 		labels[i] = ns.Repr0()
@@ -77,16 +84,16 @@ func stateListRepr[T comparable](stateList []*State[T]) string {
 	return fmt.Sprintf("[%s]", strings.Join(labels, ", "))
 }
 
-func (s *State[T]) Repr0() string {
+func (s *stateT[T]) Repr0() string {
 	var label string
 	switch s.c {
-	case NMatch:
+	case ntMatch:
 		label = "MATCH"
-	case NSplit:
+	case ntSplit:
 		label = "SPLIT"
-	case NMeta:
+	case ntMeta:
 		switch s.meta {
-		case MTAny:
+		case mtAny:
 			label = "ANY"
 		default:
 			label = "MT?"
@@ -106,14 +113,14 @@ func (s *State[T]) Repr0() string {
 		s.startsRegisters, s.endsRegisters)
 }
 
-func (s *State[T]) Repr() string {
-	saw := make(map[*State[T]]bool)
+func (s *stateT[T]) Repr() string {
+	saw := make(map[*stateT[T]]bool)
 	return s.ReprN(0, saw)
 }
 
-func (s *State[T]) ReprN(n int, saw map[*State[T]]bool) string {
+func (s *stateT[T]) ReprN(n int, saw map[*stateT[T]]bool) string {
 	// Don't record MATCH as seen; we always want to display it
-	if s.c != NMatch {
+	if s.c != ntMatch {
 		saw[s] = true
 	}
 	indent := strings.Repeat("  ", n)
@@ -128,8 +135,8 @@ func (s *State[T]) ReprN(n int, saw map[*State[T]]bool) string {
 }
 
 type Frag[T comparable] struct {
-	start *State[T]
-	out   []**State[T]
+	start *stateT[T]
+	out   []**stateT[T]
 }
 
 func (s *Frag[T]) Repr() string {
@@ -145,32 +152,32 @@ func (s *Frag[T]) Repr() string {
 }
 
 /* Patch the list of states at out to point to s. */
-func (s *reFactory[T]) patch(out []**State[T], ns *State[T]) {
+func (s *nfaFactory[T]) patch(out []**stateT[T], ns *stateT[T]) {
 	for _, p := range out {
 		*p = ns
 	}
 }
 
-func (s *reFactory[T]) ensure_stack_space() {
+func (s *nfaFactory[T]) ensure_stack_space() {
 	if len(s.stack) <= s.stp {
 		extra := s.stp - len(s.stack) + 1
 		s.stack = append(s.stack, make([]Frag[T], extra)...)
 	}
 }
 
-func (s *reFactory[T]) token2nfa(token tokenT) error {
+func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 
 	fmt.Printf("token2nfa: %+v\n", token)
 	switch token.ttype {
 
 	case tClass:
-		oclass, has := s.compiler.oclassMap[token.name]
+		class, has := s.compiler.classMap[token.name]
 		if !has {
 			return fmt.Errorf("No such class name '%s' at pos %d", token.name, token.pos)
 		}
-		ns := State[T]{c: NClass, oClass: oclass, negation: token.negation,
+		ns := stateT[T]{c: ntClass, oClass: class, negation: token.negation,
 			out: nil, out1: nil}
-		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
+		s.stack[s.stp] = Frag[T]{&ns, []**stateT[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
 
@@ -191,7 +198,7 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 		e2 := s.stack[s.stp]
 		s.stp--
 		e1 := s.stack[s.stp]
-		ns := State[T]{c: NSplit, out: e1.start, out1: e2.start}
+		ns := stateT[T]{c: ntSplit, out: e1.start, out1: e2.start}
 		s.stack[s.stp] = Frag[T]{&ns, append(e1.out, e2.out...)}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 2
@@ -200,7 +207,7 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 	case tGlobQuestion: // 0 or 1
 		s.stp--
 		e := s.stack[s.stp]
-		ns := State[T]{c: NSplit, out: e.start}
+		ns := stateT[T]{c: ntSplit, out: e.start}
 		s.stack[s.stp] = Frag[T]{&ns, append(e.out, &ns.out1)}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
@@ -209,9 +216,9 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 	case tGlobStar: // 0 or more
 		s.stp--
 		e := s.stack[s.stp]
-		ns := State[T]{c: NSplit, out: e.start}
+		ns := stateT[T]{c: ntSplit, out: e.start}
 		s.patch(e.out, &ns)
-		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out1}}
+		s.stack[s.stp] = Frag[T]{&ns, []**stateT[T]{&ns.out1}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
@@ -219,16 +226,16 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 	case tGlobPlus: // 1 or more
 		s.stp--
 		e := s.stack[s.stp]
-		ns := State[T]{c: NSplit, out: e.start}
+		ns := stateT[T]{c: ntSplit, out: e.start}
 		s.patch(e.out, &ns)
-		s.stack[s.stp] = Frag[T]{e.start, []**State[T]{&ns.out1}}
+		s.stack[s.stp] = Frag[T]{e.start, []**stateT[T]{&ns.out1}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
 
 	case tAny:
-		ns := State[T]{c: NMeta, meta: MTAny, out: nil, out1: nil}
-		s.stack[s.stp] = Frag[T]{&ns, []**State[T]{&ns.out}}
+		ns := stateT[T]{c: ntMeta, meta: mtAny, out: nil, out1: nil}
+		s.stack[s.stp] = Frag[T]{&ns, []**stateT[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
 
@@ -241,7 +248,7 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 
 	case tEndRegister:
 		ns := s.stack[s.stp-1].start
-		if ns.c == NSplit {
+		if ns.c == ntSplit {
 			ns.out.endsRegisters = append(ns.out.endsRegisters, token.int1)
 			ns.out1.endsRegisters = append(ns.out1.endsRegisters, token.int1)
 		} else {
@@ -255,7 +262,7 @@ func (s *reFactory[T]) token2nfa(token tokenT) error {
 	return nil
 }
 
-func (s *reFactory[T]) compile(text string) (*Regexp[T], error) {
+func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 
 	tokens, err := parseRegex(text)
 	if err != nil {
@@ -288,7 +295,7 @@ func (s *reFactory[T]) compile(text string) (*Regexp[T], error) {
 	re := &Regexp[T]{
 		numRegisters: s.numRegisters,
 	}
-	re.matchstate.c = NMatch
+	re.matchstate.c = ntMatch
 
 	s.patch(e.out, &re.matchstate)
 	re.nfa = e.start
