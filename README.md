@@ -5,9 +5,7 @@ of strings. But what if you aren't analyzing string?
 expressions on slices of arbitrary objects, instead of just strings.
 
 This library uses Go generics.  The objects involved in the regular
-expression must implement the "comparable" Golang contstraint. "comparable
-in Go means that "==" and "!=" work with the type.  If it's a struct,
-every field in the struct must the "comparable".
+can be of any type; the "any" constraint is used as the type constraing.
 
 To make this work, you have to define the "vocabulary" of the regular
 expression compiler. You create "object classes" (similar "character classes")
@@ -93,6 +91,11 @@ it can be any object type which satisfies the "comparable" constraint.
 
     var vowels = []rune{'A', 'E', 'I', 'O', 'U'}
 
+    // A class is comprised of a name and a function
+    // which accepts one argument of the type you used
+    // to instantiate the Compiler, and returns a boolean.
+    // The boolean indicates if the item is a member of
+    // the class.
     var VowelClass = &Class[rune]{
             "vowel",
             func(r rune) bool {
@@ -110,6 +113,9 @@ it can be any object type which satisfies the "comparable" constraint.
     func main() {
             rc := Compiler[rune]()
             compiler.RegisterClass(VowelClass)
+
+            // The compiler must be "finalized" before
+            // it can compile regexes
             compiler.Finalize()
     }
 ---
@@ -173,3 +179,36 @@ For example:
                 range.Start, range.End)
         }
 ---
+
+# Notes
+
+The regexes on this module are concurrent-safe. The same Regexp
+object can be used to Match() (with any of the related methods)
+in at the same time in different concurrent goroutines. Each
+Match uses its own state; there is no internal locking of the
+Regexp object.
+
+
+# Internals
+
+Files:
+
+* class.go - this defines the struct for Class
+* nfa.go - this generates the NFA (non-deterministic finite automata)
+* objregexp.go - this defines the Compiler and its methods
+* parse.go - this tokenizes the regex string
+* regexec.go - this executes the regex
+* regexp.go - this defines the Regexp class and its methods
+
+Flow:
+
+1.  When the Compiler is used to compile a regex, the regex string
+is tokenzied by code in parse.go.
+
+2. The tokens are then analyzed to produce an NFA, in nfa.go.
+
+3. That NFA is inserted into a Regexp object, returned to the caller.
+
+4. When the Regexp object is used to match a sequence, an executorT
+object is created in regexec.go. That executorT object carries
+the state used while traversing the sequence of objects.

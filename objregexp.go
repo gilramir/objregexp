@@ -26,7 +26,7 @@ func GetDebugLoggerOutput() *log.Logger {
 	return dlog
 }
 
-type Compiler[T comparable] struct {
+type Compiler[T any] struct {
 	finalized bool
 	namespace map[string]ccType
 	classMap  map[string]*Class[T]
@@ -43,7 +43,7 @@ const (
 	ccExemplar
 )
 
-func NewCompiler[T comparable]() *Compiler[T] {
+func NewCompiler[T any]() *Compiler[T] {
 	s := &Compiler[T]{}
 	s.Initialize()
 	return s

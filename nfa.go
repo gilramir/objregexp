@@ -17,7 +17,7 @@ import (
 
 // The state needed to convert a stream of tokenT's into a Regexp with
 // an nfa in it.
-type nfaFactory[T comparable] struct {
+type nfaFactory[T any] struct {
 	compiler *Compiler[T]
 
 	// stack pointer, and stack, while buildind the NFA stack (regexp)
@@ -28,7 +28,7 @@ type nfaFactory[T comparable] struct {
 	numRegisters int
 }
 
-func newNfaFactory[T comparable](compiler *Compiler[T]) *nfaFactory[T] {
+func newNfaFactory[T any](compiler *Compiler[T]) *nfaFactory[T] {
 	return &nfaFactory[T]{
 		compiler: compiler,
 		stack:    make([]Frag[T], 0),
@@ -60,7 +60,7 @@ const (
 
 // Important - once a regex is compiled, nothing in a stateT can change.
 // Otherwise, a single regex cannot be used in multiple concurrent goroutines
-type stateT[T comparable] struct {
+type stateT[T any] struct {
 	c nodeType
 
 	// oClass is set if c is ntClass
@@ -79,7 +79,7 @@ type stateT[T comparable] struct {
 	endsRegisters   []int
 }
 
-func stateListRepr[T comparable](stateList []*stateT[T]) string {
+func stateListRepr[T any](stateList []*stateT[T]) string {
 	labels := make([]string, len(stateList))
 	for i, ns := range stateList {
 		labels[i] = ns.Repr0()
@@ -137,7 +137,7 @@ func (s *stateT[T]) ReprN(n int, saw map[*stateT[T]]bool) string {
 	return txt
 }
 
-type Frag[T comparable] struct {
+type Frag[T any] struct {
 	start *stateT[T]
 	out   []**stateT[T]
 }

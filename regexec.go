@@ -8,7 +8,7 @@ import (
 )
 
 // Keeps track of state needed/modified during the exection of a regex
-type executorT[T comparable] struct {
+type executorT[T any] struct {
 	regex *Regexp[T]
 
 	// for stepping
@@ -31,7 +31,7 @@ func (s *executorT[T]) Initialize(regex *Regexp[T]) {
 
 // This mirrors a state object, but it's modifiable so that the same
 // Regexp object (State) can be used in multiple concrent goroutines
-type exStateT[T comparable] struct {
+type exStateT[T any] struct {
 	st *stateT[T]
 
 	// for the nfa
@@ -102,7 +102,7 @@ func (s *exStateT[T]) Repr0() string {
 	return fmt.Sprintf("<exStateT %s reg:+%v>", s.st.Repr0(), s.registers.ranges)
 }
 
-func exStateListRepr[T comparable](exStateList []*exStateT[T]) string {
+func exStateListRepr[T any](exStateList []*exStateT[T]) string {
 	labels := make([]string, len(exStateList))
 	for i, x := range exStateList {
 		labels[i] = x.Repr0()
@@ -110,7 +110,7 @@ func exStateListRepr[T comparable](exStateList []*exStateT[T]) string {
 	return fmt.Sprintf("[%s]", strings.Join(labels, ", "))
 }
 
-type hitT[T comparable] struct {
+type hitT[T any] struct {
 	x      *exStateT[T]
 	length int
 }

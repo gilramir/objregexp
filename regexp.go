@@ -2,7 +2,7 @@
 
 package objregexp
 
-type Regexp[T comparable] struct {
+type Regexp[T any] struct {
 	// the root node of the stack; where the parse begins
 	nfa *stateT[T]
 
