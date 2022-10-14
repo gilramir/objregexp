@@ -31,12 +31,16 @@ func (s *MySuite) TestParser03(c *C) {
 	c.Check(err.Error(), Equals, "Unexpected end of string")
 }
 
-func (s *MySuite) TestParser04(c *C) {
-	text := "[: space:]"
+func (s *MySuite) TestParser04a(c *C) {
+	text := "[: spaces are legal :]"
 	_, err := parseRegex(text)
-	c.Assert(err, NotNil)
-	c.Check(err.Error(), Equals,
-		"The class name starting at pos 2 has a space in it")
+	c.Assert(err, IsNil)
+}
+
+func (s *MySuite) TestParser04b(c *C) {
+	text := "[:방탄소년단:]"
+	_, err := parseRegex(text)
+	c.Assert(err, IsNil)
 }
 
 func (s *MySuite) TestParser05(c *C) {

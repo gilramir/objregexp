@@ -255,3 +255,105 @@ func (s *MySuite) TestRegexp04d(c *C) {
 	c.Check(m.Register(1).Start, Equals, 1)
 	c.Check(m.Register(1).End, Equals, 2)
 }
+
+// Test Glob * for greediness
+func (s *MySuite) TestRegexpGlob01(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.RegisterClass(VowelClass)
+	compiler.RegisterClass(ConsonantClass)
+	compiler.RegisterClass(DigitClass)
+	compiler.Finalize()
+
+	text := "[:digit:]*"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'8', '9', '0'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 3)
+
+	input = []rune{'7'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 1)
+
+	/*
+		TODO - handle this
+
+		input = []rune{}
+		m = re.Match(input)
+		c.Check(m.Success, Equals, true)
+		c.Check(m.Range.Start, Equals, 0)
+		c.Check(m.Range.End, Equals, 0)
+	*/
+
+	input = []rune{'A'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, false)
+}
+
+// Test Glob + for greediness
+func (s *MySuite) TestRegexpGlob02(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.RegisterClass(VowelClass)
+	compiler.RegisterClass(ConsonantClass)
+	compiler.RegisterClass(DigitClass)
+	compiler.Finalize()
+
+	text := "[:digit:]+"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'8', '9', '0'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 3)
+
+	input = []rune{'7'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 1)
+
+	input = []rune{'A'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, false)
+}
+
+// Test Glob ? for greediness
+func (s *MySuite) TestRegexpGlob03(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.RegisterClass(VowelClass)
+	compiler.RegisterClass(ConsonantClass)
+	compiler.RegisterClass(DigitClass)
+	compiler.Finalize()
+
+	text := "[:digit:][:digit:]?"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'8', '9', '0'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 2)
+
+	input = []rune{'7', '8'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 2)
+
+	input = []rune{'8'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 1)
+}

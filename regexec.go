@@ -110,6 +110,11 @@ func exStateListRepr[T comparable](exStateList []*exStateT[T]) string {
 	return fmt.Sprintf("[%s]", strings.Join(labels, ", "))
 }
 
+type hitT[T comparable] struct {
+	x      *exStateT[T]
+	length int
+}
+
 // Walk the list of states, which can expand into branches.
 // If full is true, wait until the end of the string to check for a final match
 // If full is false, return true as soon as a match is found
@@ -120,6 +125,10 @@ func (s *executorT[T]) match(start *stateT[T], input []T, from int, full bool) (
 	var clist, nlist []*exStateT[T]
 	s.listid++
 	clist = s.addstate(clist, xstart)
+
+	// Keep track of matches because we want to be a little greedy
+	// and not return too early
+	var hit hitT[T]
 
 	for i := from; i < len(input); i++ {
 		ch := input[i]
@@ -133,7 +142,15 @@ func (s *executorT[T]) match(start *stateT[T], input []T, from int, full bool) (
 
 		if !full {
 			if matched, xns := s.ismatch(clist); matched {
-				return true, i - from + 1, xns
+				hit = hitT[T]{x: xns, length: i - from + 1}
+				fmt.Printf("MATCHED and stored hit %+v\n", hit)
+				//				return true, i - from + 1, xns
+			} else {
+				fmt.Printf("NO MATCH and stored hit %+v\n", hit)
+				if hit.x != nil {
+					// now we can return
+					return true, hit.length, hit.x
+				}
 			}
 		}
 	}
@@ -145,6 +162,11 @@ func (s *executorT[T]) match(start *stateT[T], input []T, from int, full bool) (
 			return false, 0, nil
 		}
 	} else {
+		fmt.Printf("FINISHED and stored hit %+v\n", hit)
+		if hit.x != nil {
+			// now we can return
+			return true, hit.length, hit.x
+		}
 		// If we weren't looking for a full match, and didn't already find
 		// it, then we didn't find it.
 		return false, 0, nil
