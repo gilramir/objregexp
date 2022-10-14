@@ -34,7 +34,8 @@ In this syntax:
 
 * Alternate choices are given via the vertical pipe: |
 
-* These "repeat" indicators are supported: +, \*, ?
+* These "glob" patterns are supported: "+", "\*", and "?". They are greedy;
+  they will match as many objects as they can.
 
 * Whitespace has no meaning and can be used liberally throughout
         your reggex to make it more readable.
@@ -107,7 +108,7 @@ it can be any object type which satisfies the "comparable" constraint.
 
 
     func main() {
-            rc := Compiler[MyType]()
+            rc := Compiler[rune]()
             compiler.RegisterClass(VowelClass)
             compiler.Finalize()
     }
@@ -145,6 +146,7 @@ the regular expression on a slice of objects:
 * *FullMatchAt* - Like above, but starting at a specific index
 * *Search* - Find the first match, starting at any index
 * *SearchAt* - Find the first match, starting at a specific index
+
 
 ## The Match object
 
