@@ -95,9 +95,9 @@ it can be any object type which satisfies the "comparable" constraint.
     var VowelClass = &Class[rune]{
             "vowel",
             func(r rune) bool {
+                    // Is this rune in the list of vowel runes?
                     for _, t := range vowels {
                             if r == t {
-                                    fmt.Printf("returning true\n")
                                     return true
                             }
                     }
@@ -159,7 +159,7 @@ based on their number, starting with 1.
 For example:
 
 ---
-        pattern = "[:vowel:]([!:vowel:])"
+        pattern = "[:vowel:] ([!:vowel:])"
         regex, err := compiler.Compile(pattern)
 
         objects := []rune{ 'A', 'X' }
