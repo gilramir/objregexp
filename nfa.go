@@ -26,6 +26,10 @@ type nfaFactory[T comparable] struct {
 
 	// how many registers are addressed by this regex
 	numRegisters int
+
+	// the register numbers that start at the beginning
+	// of the regex, before any other tokens
+	startRegisters []int
 }
 
 func newNfaFactory[T comparable](compiler *Compiler[T]) *nfaFactory[T] {
@@ -265,8 +269,14 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.ensure_stack_space()
 
 	case tStartRegister:
-		ns := s.stack[s.stp-1].start
-		ns.startsRegisters = append(ns.startsRegisters, token.int1)
+		if s.stp > 0 {
+			ns := s.stack[s.stp-1].start
+			ns.startsRegisters = append(ns.startsRegisters, token.int1)
+		} else {
+			// Parens at the start of the string.
+			// Will need to deal with this later
+			s.startRegisters = append(s.startRegisters, token.int1)
+		}
 		if token.int1 > s.numRegisters {
 			s.numRegisters = token.int1
 		}
@@ -318,9 +328,13 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 			e.Repr()))
 	}
 	re := &Regexp[T]{
-		numRegisters: s.numRegisters,
+		numRegisters:   s.numRegisters,
+		startRegisters: make([]int, len(s.startRegisters)),
 	}
 	re.matchstate.c = ntMatch
+	if len(s.startRegisters) > 0 {
+		copy(re.startRegisters, s.startRegisters)
+	}
 
 	s.patch(e.out, &re.matchstate)
 	re.nfa = e.start

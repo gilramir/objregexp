@@ -122,6 +122,11 @@ func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool
 
 	xstart := s.exStateRecursive(start)
 
+	// Any starting registers?
+	for _, rn := range s.regex.startRegisters {
+		xstart.registers.ranges[rn-1].Start = 0
+	}
+
 	var clist, nlist []*exStateT[T]
 	s.listid++
 	clist = s.addstate(clist, xstart)

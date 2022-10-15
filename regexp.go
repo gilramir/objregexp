@@ -12,6 +12,10 @@ type Regexp[T comparable] struct {
 
 	// How many registers can be saved to by this regex
 	numRegisters int
+
+	// the register numbers that start at the beginning
+	// of the regex, before any other tokens
+	startRegisters []int
 }
 
 // This is used to record the span of objects, relative to the
@@ -24,6 +28,14 @@ type Range struct {
 	End   int
 }
 
+func (s Range) Length() int {
+	return s.End - s.Start
+}
+
+func (s Range) Empty() bool {
+	return s.End-s.Start == 0
+}
+
 // Returned by a Regexp matching-related function.
 type Match struct {
 	// Did the Regexp find something?
@@ -34,6 +46,10 @@ type Match struct {
 
 	registers []Range
 	//	Group   map[string]Range
+}
+
+func (s Match) Length() int {
+	return s.Range.Length()
 }
 
 // Get a numbered register from the Match. Every left parenthesis
