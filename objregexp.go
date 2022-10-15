@@ -28,25 +28,22 @@ func GetDebugLoggerOutput() *log.Logger {
 
 // The regex compiler. This holds all the user-defined classes
 // that can be used in the regexes.
-type Compiler[T any] struct {
-	finalized bool
-	namespace map[string]ccType
-	classMap  map[string]*Class[T]
-	/*
-		exemplarObj  map[string]T
-		exemplarName map[T]string
-	*/
+type Compiler[T comparable] struct {
+	finalized   bool
+	namespace   map[string]ccType
+	classMap    map[string]*Class[T]
+	identityObj map[string]T
 }
 
 type ccType int
 
 const (
 	ccClass = iota + 1
-	ccExemplar
+	ccIdentity
 )
 
 // Instantiates and initializes a new Compiler.
-func NewCompiler[T any]() *Compiler[T] {
+func NewCompiler[T comparable]() *Compiler[T] {
 	s := &Compiler[T]{}
 	s.Initialize()
 	return s
@@ -59,10 +56,7 @@ func (s *Compiler[T]) Initialize() {
 
 	s.namespace = make(map[string]ccType)
 	s.classMap = make(map[string]*Class[T])
-	/*
-		s.exemplarObj = make(map[string]T)
-		s.exemplarName = make(map[T]string)
-	*/
+	s.identityObj = make(map[string]T)
 }
 
 func (s *Compiler[T]) assertFinalized() {
@@ -85,15 +79,15 @@ func (s *Compiler[T]) Finalize() {
 }
 
 // Registers a user-defined class.
-func (s *Compiler[T]) RegisterClass(oClass *Class[T]) {
+func (s *Compiler[T]) AddClass(oClass *Class[T]) {
 
 	if t, has := s.namespace[oClass.Name]; has {
 		var msg string
 		switch t {
 		case ccClass:
 			msg = fmt.Sprintf("A class with name '%s' already exists", oClass.Name)
-		case ccExemplar:
-			msg = fmt.Sprintf("An exemplar with name '%s' already exists", oClass.Name)
+		case ccIdentity:
+			msg = fmt.Sprintf("An identity with name '%s' already exists", oClass.Name)
 		}
 		panic(msg)
 	}
@@ -108,7 +102,24 @@ func (s *Compiler[T]) MakeClass(name string, predicate func(T) bool) {
 		Name:    name,
 		Matches: predicate,
 	}
-	s.RegisterClass(class)
+	s.AddClass(class)
+}
+
+// Registers a user-defined identity.
+func (s *Compiler[T]) AddIdentity(name string, object T) {
+
+	if t, has := s.namespace[name]; has {
+		var msg string
+		switch t {
+		case ccClass:
+			msg = fmt.Sprintf("A class with name '%s' already exists", name)
+		case ccIdentity:
+			msg = fmt.Sprintf("An identity with name '%s' already exists", name)
+		}
+		panic(msg)
+	}
+	s.identityObj[name] = object
+	s.namespace[name] = ccIdentity
 }
 
 // Compile a regex string into a Regexp object.

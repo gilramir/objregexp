@@ -10,7 +10,7 @@ import (
 func (s *MySuite) TestRegexp01(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
+	compiler.AddClass(VowelClass)
 	compiler.Finalize()
 
 	re_vowel, err := compiler.Compile("[:vowel:]")
@@ -41,7 +41,7 @@ func (s *MySuite) TestRegexp01(c *C) {
 func (s *MySuite) TestRegexp02(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
+	compiler.AddClass(VowelClass)
 	compiler.Finalize()
 
 	re_vowel, err := compiler.Compile("[:vowel:]")
@@ -70,9 +70,9 @@ func (s *MySuite) TestRegexp02(c *C) {
 func (s *MySuite) TestRegexp03a(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:] [:consonant:]"
@@ -96,9 +96,9 @@ func (s *MySuite) TestRegexp03a(c *C) {
 func (s *MySuite) TestRegexp03b(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:] | [:consonant:]"
@@ -122,9 +122,9 @@ func (s *MySuite) TestRegexp03b(c *C) {
 func (s *MySuite) TestRegexp04a(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:] ( [:vowel:] ) [:consonant:]"
@@ -160,9 +160,9 @@ func (s *MySuite) TestRegexp04a(c *C) {
 func (s *MySuite) TestRegexp04b(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:] ( [:vowel:] | [:consonant:] ) [:digit:]"
@@ -182,9 +182,9 @@ func (s *MySuite) TestRegexp04b(c *C) {
 func (s *MySuite) TestRegexp04c(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:] ( [:digit:] ( [:vowel:] | [:consonant:] ) )?"
@@ -222,9 +222,9 @@ func (s *MySuite) TestRegexp04c(c *C) {
 func (s *MySuite) TestRegexp04d(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:] ( [:vowel:]+ | [:consonant:] ) [:digit:]"
@@ -260,9 +260,9 @@ func (s *MySuite) TestRegexp04d(c *C) {
 func (s *MySuite) TestRegexpGlob01(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:]*"
@@ -300,9 +300,9 @@ func (s *MySuite) TestRegexpGlob01(c *C) {
 func (s *MySuite) TestRegexpGlob02(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:]+"
@@ -330,9 +330,9 @@ func (s *MySuite) TestRegexpGlob02(c *C) {
 func (s *MySuite) TestRegexpGlob03(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	text := "[:digit:][:digit:]?"

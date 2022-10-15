@@ -8,7 +8,7 @@ import (
 )
 
 // Keeps track of state needed/modified during the exection of a regex
-type executorT[T any] struct {
+type executorT[T comparable] struct {
 	regex *Regexp[T]
 
 	// for stepping
@@ -31,7 +31,7 @@ func (s *executorT[T]) Initialize(regex *Regexp[T]) {
 
 // This mirrors a state object, but it's modifiable so that the same
 // Regexp object (State) can be used in multiple concrent goroutines
-type exStateT[T any] struct {
+type exStateT[T comparable] struct {
 	st *nfaStateT[T]
 
 	// for the nfa
@@ -102,7 +102,7 @@ func (s *exStateT[T]) Repr0() string {
 	return fmt.Sprintf("<exStateT %s reg:+%v>", s.st.Repr0(), s.registers.ranges)
 }
 
-func exStateListRepr[T any](exStateList []*exStateT[T]) string {
+func exStateListRepr[T comparable](exStateList []*exStateT[T]) string {
 	labels := make([]string, len(exStateList))
 	for i, x := range exStateList {
 		labels[i] = x.Repr0()
@@ -110,7 +110,7 @@ func exStateListRepr[T any](exStateList []*exStateT[T]) string {
 	return fmt.Sprintf("[%s]", strings.Join(labels, ", "))
 }
 
-type hitT[T any] struct {
+type hitT[T comparable] struct {
 	x      *exStateT[T]
 	length int
 }
@@ -211,6 +211,14 @@ func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStat
 		case ntClass:
 			matches = ns.oClass.Matches(ch)
 			dlog.Printf("Matches class %s: %v", ns.oClass.Name, matches)
+			// Are we testing for non-memberhood?
+			if ns.negation {
+				matches = !matches
+				dlog.Printf("Negation -> %v", matches)
+			}
+		case ntIdentity:
+			matches = ns.iObj == ch
+			dlog.Printf("Identiy %s: %v", ns.iName, matches)
 			// Are we testing for non-memberhood?
 			if ns.negation {
 				matches = !matches

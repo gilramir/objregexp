@@ -17,7 +17,7 @@ import (
 
 // The state needed to convert a stream of tokenT's into a Regexp with
 // an nfa in it.
-type nfaFactory[T any] struct {
+type nfaFactory[T comparable] struct {
 	compiler *Compiler[T]
 
 	// stack pointer, and stack, while buildind the NFA stack (regexp)
@@ -28,7 +28,7 @@ type nfaFactory[T any] struct {
 	numRegisters int
 }
 
-func newNfaFactory[T any](compiler *Compiler[T]) *nfaFactory[T] {
+func newNfaFactory[T comparable](compiler *Compiler[T]) *nfaFactory[T] {
 	return &nfaFactory[T]{
 		compiler: compiler,
 		stack:    make([]fragT[T], 0),
@@ -46,6 +46,7 @@ type nodeType int
 
 const (
 	ntClass nodeType = iota
+	ntIdentity
 	ntMeta
 	ntMatch
 	ntSplit
@@ -60,11 +61,17 @@ const (
 
 // Important - once a regex is compiled, nothing in a nfaStateT can change.
 // Otherwise, a single regex cannot be used in multiple concurrent goroutines
-type nfaStateT[T any] struct {
+type nfaStateT[T comparable] struct {
 	c nodeType
 
 	// oClass is set if c is ntClass
-	oClass   *Class[T]
+	oClass *Class[T]
+
+	// iObj and iName are set if c is ntIdentity
+	iObj  T
+	iName string
+
+	// negation is valid for either oClass or iObj
 	negation bool
 	// meta is set if c is ntMeta
 	meta metaType
@@ -79,7 +86,7 @@ type nfaStateT[T any] struct {
 	endsRegisters   []int
 }
 
-func stateListRepr[T any](stateList []*nfaStateT[T]) string {
+func stateListRepr[T comparable](stateList []*nfaStateT[T]) string {
 	labels := make([]string, len(stateList))
 	for i, ns := range stateList {
 		labels[i] = ns.Repr0()
@@ -137,7 +144,7 @@ func (s *nfaStateT[T]) ReprN(n int, saw map[*nfaStateT[T]]bool) string {
 	return txt
 }
 
-type fragT[T any] struct {
+type fragT[T comparable] struct {
 	start *nfaStateT[T]
 	out   []**nfaStateT[T]
 }
@@ -173,13 +180,28 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 	dlog.Printf("token2nfa: %+v", token)
 	switch token.ttype {
 
-	case tClass:
-		class, has := s.compiler.classMap[token.name]
+	case tClass: // could be a Class or an identity
+		ctype, has := s.compiler.namespace[token.name]
 		if !has {
-			return fmt.Errorf("No such class name '%s' at pos %d", token.name, token.pos)
+			return fmt.Errorf("No such class or identity name '%s' at pos %d", token.name, token.pos)
 		}
-		ns := nfaStateT[T]{c: ntClass, oClass: class, negation: token.negation,
-			out: nil, out1: nil}
+		var ns nfaStateT[T]
+		switch ctype {
+		case ccClass:
+			class, has := s.compiler.classMap[token.name]
+			if !has {
+				panic(fmt.Sprintf("Should have found class '%s' at pos %d", token.name, token.pos))
+			}
+			ns = nfaStateT[T]{c: ntClass, oClass: class, negation: token.negation,
+				out: nil, out1: nil}
+		case ccIdentity:
+			obj, has := s.compiler.identityObj[token.name]
+			if !has {
+				panic(fmt.Sprintf("Should have found identity '%s' at pos %d", token.name, token.pos))
+			}
+			ns = nfaStateT[T]{c: ntIdentity, iObj: obj, iName: token.name, negation: token.negation,
+				out: nil, out1: nil}
+		}
 		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()

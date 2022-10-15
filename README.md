@@ -6,11 +6,14 @@ of strings. But what if you aren't analyzing string?
 expressions on slices of arbitrary objects, instead of just strings.
 
 This library uses Go generics.  The objects involved in the regular
-can be of any type; the "any" constraint is used as the type constraing.
+must satisfy the "comparable" constraint.
 
-To make this work, you have to define the "vocabulary" of the regular
-expression compiler. You create "object classes" (similar "character classes")
-which will declare if an object belongs to the class.
+To use this module, you have to define the "vocabulary" of the regular
+expression compiler. You create "object classes" (similar "character classes").
+On type of class is a function, which delcares if an object belongs to the
+class. Another type of class is an identity; a name is given to an object,
+and if the input object compares to it equally, then it is a member of the
+class.
 
 Given the classes, you can write regular expressions using basic
 regular expression syntax.
@@ -117,7 +120,12 @@ it can be any object type which satisfies the "comparable" constraint.
 
     func main() {
             rc := Compiler[rune]()
-            compiler.RegisterClass(VowelClass)
+
+            // Add a class function
+            compiler.AddClass(VowelClass)
+
+            // Add an identity
+            compiler.AddIdentity("lower x", 'x')
 
             // The compiler must be "finalized" before
             // it can compile regexes
@@ -133,14 +141,14 @@ all your object classes, use the Compiler object to compile
 regular expressions into Regexp objects.
 
 ---
-        pattern = "[:vowel:]*"
+        pattern = "[:vowel:]* [:lower x:]"
         regex, err := compiler.Compile(pattern)
 ---
 
 ## Use the Regexp on a slice of objects
 
 ---
-        objects := []rune{ 'A', 'E', 'I' }
+        objects := []rune{ 'A', 'E', 'I', 'x' }
 
         m = regex.Match(objects)
         if m.Success {

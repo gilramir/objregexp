@@ -47,30 +47,12 @@ var DigitClass = &Class[rune]{
 	},
 }
 
-/*
-var ioMap = map[string]string{
-	"A": "A",
-	"B": "B",
-	"C": "C",
-}
-
-func ioMapper(name string, inputTarget string) *TASTNode {
-	values := make([]string, 1)
-	values[0] = string(inputTarget)
-	return &TASTNode{
-		values:   values,
-		consumed: 1,
-	}
-}
-
-*/
-
 // SImple one-class test
 func (s *MySuite) TestClass01(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
+	compiler.AddClass(VowelClass)
 	compiler.Finalize()
 
 	re_vowel, err := compiler.Compile("[:vowel:]")
@@ -96,7 +78,7 @@ func (s *MySuite) TestClass02(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
+	compiler.AddClass(VowelClass)
 	compiler.Finalize()
 
 	re_not_vowel, err := compiler.Compile("[!:vowel:]")
@@ -122,8 +104,8 @@ func (s *MySuite) TestClass03(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(ConsonantClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
 	compiler.Finalize()
 
 	re_vc, err := compiler.Compile("[:vowel:] [:consonant:]")
@@ -151,7 +133,7 @@ func (s *MySuite) TestGlob01(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
+	compiler.AddClass(VowelClass)
 	compiler.Finalize()
 
 	re_vg, err := compiler.Compile("[:vowel:]*")
@@ -183,7 +165,7 @@ func (s *MySuite) TestGlob02(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
+	compiler.AddClass(VowelClass)
 	compiler.Finalize()
 
 	re_vg, err := compiler.Compile("[:vowel:]+")
@@ -215,7 +197,7 @@ func (s *MySuite) TestGlob03(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
+	compiler.AddClass(VowelClass)
 	compiler.Finalize()
 
 	re_vg, err := compiler.Compile("[:vowel:]?")
@@ -244,8 +226,8 @@ func (s *MySuite) TestParen01(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	re_vg, err := compiler.Compile("[:vowel:] ([:digit:][:digit:])")
@@ -273,8 +255,8 @@ func (s *MySuite) TestParen02(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(VowelClass)
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	re_vg, err := compiler.Compile("[:vowel:] ([:digit:][:vowel:])?")
@@ -306,7 +288,7 @@ func (s *MySuite) TestMetaAny(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
 
-	compiler.RegisterClass(DigitClass)
+	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
 	re_vowel, err := compiler.Compile("[:digit:] . [:digit:]")
@@ -335,4 +317,24 @@ func (s *MySuite) TestMetaAny(c *C) {
 	input = []rune{'M', 'X', 'Z'}
 	m = re_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, false)
+}
+
+func (s *MySuite) TestIdentity01(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+
+	compiler.AddClass(DigitClass)
+	compiler.AddIdentity("lower x", 'x')
+	compiler.Finalize()
+
+	re_vowel, err := compiler.Compile("[:digit:] [:lower x:] [:digit:]")
+	c.Assert(err, IsNil)
+
+	input := []rune{'9', 'X', '1'}
+	m := re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'9', 'x', '1'}
+	m = re_vowel.FullMatch(input)
+	c.Check(m.Success, Equals, true)
 }

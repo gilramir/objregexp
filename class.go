@@ -2,7 +2,7 @@
 
 package objregexp
 
-type Class[T any] struct {
+type Class[T comparable] struct {
 	Name    string
 	Matches func(T) bool
 }
