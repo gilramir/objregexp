@@ -193,9 +193,23 @@ func (s *nfaStateT[T]) writeDot(saw map[*nfaStateT[T]]bool, fh io.Writer) error 
 	return err
 }
 
-func (s *nfaStateT[T]) fixEndRegistersRecursive(saw map[*nfaStateT[T]]bool) {
+func (s *nfaStateT[T]) fixRegistersRecursive(saw map[*nfaStateT[T]]bool) {
 	saw[s] = true
 	if s.c == ntSplit {
+		if len(s.startsRegisters) > 0 {
+			// We need to push these out
+			pushSaw := make(map[*nfaStateT[T]]bool)
+			if !saw[s.out] {
+				s.out.pushStartRegistersRecursive(pushSaw, s.startsRegisters)
+				//saw[s.out] = true
+			}
+			if !saw[s.out1] {
+				s.out1.pushStartRegistersRecursive(pushSaw, s.startsRegisters)
+				//saw[s.out1] = true
+			}
+			// clear the slice
+			s.startsRegisters = s.startsRegisters[:0]
+		}
 		if len(s.endsRegisters) > 0 {
 			// We need to push these out
 			pushSaw := make(map[*nfaStateT[T]]bool)
@@ -213,12 +227,37 @@ func (s *nfaStateT[T]) fixEndRegistersRecursive(saw map[*nfaStateT[T]]bool) {
 	}
 
 	if s.out != nil && !saw[s.out] {
-		s.out.fixEndRegistersRecursive(saw)
+		s.out.fixRegistersRecursive(saw)
 	}
 	if s.out1 != nil && !saw[s.out1] {
-		s.out.fixEndRegistersRecursive(saw)
+		s.out.fixRegistersRecursive(saw)
 	}
 
+}
+
+func (s *nfaStateT[T]) pushStartRegistersRecursive(saw map[*nfaStateT[T]]bool, er []int) {
+	if saw[s] {
+		return
+	}
+	saw[s] = true
+
+	if s.c == ntSplit {
+		s.out.pushStartRegistersRecursive(saw, er)
+		s.out1.pushStartRegistersRecursive(saw, er)
+		return
+	} else {
+		for _, reg := range er {
+			has := false
+			for _, xreg := range s.startsRegisters {
+				if xreg == reg {
+					has = true
+				}
+			}
+			if !has {
+				s.startsRegisters = append(s.startsRegisters, reg)
+			}
+		}
+	}
 }
 
 func (s *nfaStateT[T]) pushEndRegistersRecursive(saw map[*nfaStateT[T]]bool, er []int) {
@@ -450,7 +489,7 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 	// The "EndRegister" info might be placed on ntSplit nodes;
 	// if so, move those down.
 	saw := make(map[*nfaStateT[T]]bool)
-	re.nfa.fixEndRegistersRecursive(saw)
+	re.nfa.fixRegistersRecursive(saw)
 
 	// Dump it.
 	dlog.Printf("nfa:\n%s", re.nfa.Repr())
