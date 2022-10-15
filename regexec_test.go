@@ -190,6 +190,8 @@ func (s *MySuite) TestRegexp04c(c *C) {
 	text := "[:digit:] ( [:digit:] ( [:vowel:] | [:consonant:] ) )?"
 	re, err := compiler.Compile(text)
 	c.Assert(err, IsNil)
+	//	err = re.WriteDot("TestRegexp04c.dot")
+	//	c.Assert(err, IsNil)
 
 	input := []rune{'8', '7', 'A'}
 	m := re.FullMatch(input)
@@ -197,7 +199,7 @@ func (s *MySuite) TestRegexp04c(c *C) {
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 3)
 	c.Check(m.Register(1).Start, Equals, 1)
-	c.Check(m.Register(1).End, Equals, 2)
+	c.Check(m.Register(1).End, Equals, 3)
 	c.Check(m.Register(2).Start, Equals, 2)
 	c.Check(m.Register(2).End, Equals, 3)
 

@@ -259,27 +259,29 @@ func (s *MySuite) TestParen02(c *C) {
 	compiler.AddClass(DigitClass)
 	compiler.Finalize()
 
-	re_vg, err := compiler.Compile("[:vowel:] ([:digit:][:vowel:])?")
+	re, err := compiler.Compile("[:vowel:] ([:digit:][:vowel:])?")
 	c.Assert(err, IsNil)
+	//err = re.WriteDot("TestParen02.dot")
+	//c.Assert(err, IsNil)
 
 	input := []rune{'B'}
-	m := re_vg.FullMatch(input)
+	m := re.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A'}
-	m = re_vg.FullMatch(input)
+	m = re.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
 	input = []rune{'A', '9'}
-	m = re_vg.FullMatch(input)
+	m = re.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A', '9', '8'}
-	m = re_vg.FullMatch(input)
+	m = re.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 
 	input = []rune{'A', '9', '9'}
-	m = re_vg.FullMatch(input)
+	m = re.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }
 

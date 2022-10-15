@@ -2,6 +2,11 @@
 
 package objregexp
 
+import (
+	"fmt"
+	"os"
+)
+
 // The compiled regex.
 type Regexp[T comparable] struct {
 	// the root node of the stack; where the parse begins
@@ -16,6 +21,41 @@ type Regexp[T comparable] struct {
 	// the register numbers that start at the beginning
 	// of the regex, before any other tokens
 	startRegisters []int
+}
+
+// Write the NFA to a dot file, for visualization with graphviz
+func (s *Regexp[T]) WriteDot(filename string) error {
+	fh, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer fh.Close()
+
+	_, err = fmt.Fprintf(fh, "digraph {\n")
+	if err != nil {
+		return err
+	}
+
+	root := fmt.Sprintf("Root #r:%d sr:%v", s.numRegisters, s.startRegisters)
+
+	_, err = fmt.Fprintf(fh, "\troot [label=\"%s\"]\n", root)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(fh, "\troot -> N%p\n", s.nfa)
+	if err != nil {
+		return err
+	}
+
+	saw := make(map[*nfaStateT[T]]bool)
+	err = s.nfa.writeDot(saw, fh)
+	if err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintf(fh, "}\n")
+
+	return err
 }
 
 // This is used to record the span of objects, relative to the

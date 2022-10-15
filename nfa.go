@@ -4,6 +4,7 @@ package objregexp
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -37,6 +38,14 @@ func newNfaFactory[T comparable](compiler *Compiler[T]) *nfaFactory[T] {
 		compiler: compiler,
 		stack:    make([]fragT[T], 0),
 	}
+}
+
+func (s *nfaFactory[T]) stackRepr() string {
+	repr := ""
+	for i := 0; i < s.stp; i++ {
+		repr += fmt.Sprintf("#%d: %s\n", i, s.stack[i].Repr())
+	}
+	return repr
 }
 
 /*
@@ -112,15 +121,18 @@ func (s *nfaStateT[T]) Repr0() string {
 		default:
 			label = "MT?"
 		}
-	default:
-		if s.oClass != nil {
-			if s.negation {
-				label = "!" + s.oClass.Name
-			} else {
-				label = s.oClass.Name
-			}
+
+	case ntClass:
+		if s.negation {
+			label = "!" + s.oClass.Name
 		} else {
-			label = "?"
+			label = s.oClass.Name
+		}
+	case ntIdentity:
+		if s.negation {
+			label = "!" + s.iName
+		} else {
+			label = s.iName
 		}
 	}
 	return fmt.Sprintf("<State %s sr:%v er:%v>", label,
@@ -139,6 +151,7 @@ func (s *nfaStateT[T]) ReprN(n int, saw map[*nfaStateT[T]]bool) string {
 	}
 	indent := strings.Repeat("  ", n)
 	txt := fmt.Sprintf("%s%s", indent, s.Repr0())
+	saw[s] = true
 	if s.out != nil && !saw[s.out] {
 		txt += "\n" + s.out.ReprN(n+1, saw)
 	}
@@ -146,6 +159,91 @@ func (s *nfaStateT[T]) ReprN(n int, saw map[*nfaStateT[T]]bool) string {
 		txt += "\n" + s.out1.ReprN(n+1, saw)
 	}
 	return txt
+}
+
+// Write the NFA to a dot file, for visualization with graphviz
+func (s *nfaStateT[T]) writeDot(saw map[*nfaStateT[T]]bool, fh io.Writer) error {
+	_, err := fmt.Fprintf(fh, "\tN%p [label=\"%s\"]\n", s, s.Repr0())
+	if err != nil {
+		return err
+	}
+	saw[s] = true
+	if s.out != nil {
+		_, err = fmt.Fprintf(fh, "\tN%p -> N%p\n", s, s.out)
+	}
+	if err != nil {
+		return err
+	}
+	if s.out1 != nil {
+		_, err := fmt.Fprintf(fh, "\tN%p -> N%p\n", s, s.out1)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprintln(fh)
+	if err != nil {
+		return err
+	}
+	if s.out != nil && !saw[s.out] {
+		s.out.writeDot(saw, fh)
+	}
+	if s.out1 != nil && !saw[s.out1] {
+		s.out1.writeDot(saw, fh)
+	}
+	return err
+}
+
+func (s *nfaStateT[T]) fixEndRegistersRecursive(saw map[*nfaStateT[T]]bool) {
+	saw[s] = true
+	if s.c == ntSplit {
+		if len(s.endsRegisters) > 0 {
+			// We need to push these out
+			pushSaw := make(map[*nfaStateT[T]]bool)
+			if !saw[s.out] {
+				s.out.pushEndRegistersRecursive(pushSaw, s.endsRegisters)
+				//saw[s.out] = true
+			}
+			if !saw[s.out1] {
+				s.out1.pushEndRegistersRecursive(pushSaw, s.endsRegisters)
+				//saw[s.out1] = true
+			}
+			// clear the slice
+			s.endsRegisters = s.endsRegisters[:0]
+		}
+	}
+
+	if s.out != nil && !saw[s.out] {
+		s.out.fixEndRegistersRecursive(saw)
+	}
+	if s.out1 != nil && !saw[s.out1] {
+		s.out.fixEndRegistersRecursive(saw)
+	}
+
+}
+
+func (s *nfaStateT[T]) pushEndRegistersRecursive(saw map[*nfaStateT[T]]bool, er []int) {
+	if saw[s] {
+		return
+	}
+	saw[s] = true
+
+	if s.c == ntSplit {
+		s.out.pushEndRegistersRecursive(saw, er)
+		s.out1.pushEndRegistersRecursive(saw, er)
+		return
+	} else {
+		for _, reg := range er {
+			has := false
+			for _, xreg := range s.endsRegisters {
+				if xreg == reg {
+					has = true
+				}
+			}
+			if !has {
+				s.endsRegisters = append(s.endsRegisters, reg)
+			}
+		}
+	}
 }
 
 type fragT[T comparable] struct {
@@ -282,13 +380,23 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		}
 
 	case tEndRegister:
+		dlog.Printf("stack:\n%s\n", s.stackRepr())
 		ns := s.stack[s.stp-1].start
-		if ns.c == ntSplit {
-			ns.out.endsRegisters = append(ns.out.endsRegisters, token.int1)
-			ns.out1.endsRegisters = append(ns.out1.endsRegisters, token.int1)
-		} else {
-			ns.endsRegisters = append(ns.endsRegisters, token.int1)
+		if ns.out != nil && ns.out1 == nil {
+			dlog.Printf("choosing %s 's out -> %s", ns.Repr0(), ns.out.Repr0())
+			ns = ns.out
 		}
+		dlog.Printf("Adding EndRegister %d to ns #%d %s", token.int1,
+			s.stp, ns.Repr0())
+		/*
+			if ns.c == ntSplit {
+				ns.out.endsRegisters = append(ns.out.endsRegisters, token.int1)
+				ns.out1.endsRegisters = append(ns.out1.endsRegisters, token.int1)
+			} else {
+				ns.endsRegisters = append(ns.endsRegisters, token.int1)
+			}
+		*/
+		ns.endsRegisters = append(ns.endsRegisters, token.int1)
 
 	default:
 		e := fmt.Sprintf("token2nfa: %s not yet handled\n", string(token.ttype))
@@ -338,6 +446,11 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 
 	s.patch(e.out, &re.matchstate)
 	re.nfa = e.start
+
+	// The "EndRegister" info might be placed on ntSplit nodes;
+	// if so, move those down.
+	saw := make(map[*nfaStateT[T]]bool)
+	re.nfa.fixEndRegistersRecursive(saw)
 
 	// Dump it.
 	dlog.Printf("nfa:\n%s", re.nfa.Repr())

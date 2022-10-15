@@ -119,6 +119,30 @@ type hitT[T comparable] struct {
 // If full is true, wait until the end of the string to check for a final match
 // If full is false, return true as soon as a match is found
 func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
+	ok, count, xns := s._match(start, input, from, full)
+	if ok {
+		// sanity check
+		for i, reg := range xns.registers.ranges {
+			if reg.End == -1 {
+				reg.Start = -1
+				/*
+					if reg.Start != -1 {
+						msg := fmt.Sprintf("Reg %d is %+v", i+1, reg)
+						panic(msg)
+					}
+				*/
+			} else if reg.Start == -1 {
+				if reg.End != -1 {
+					msg := fmt.Sprintf("Reg %d is %+v", i+1, reg)
+					panic(msg)
+				}
+			}
+		}
+	}
+	return ok, count, xns
+}
+
+func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
 
 	xstart := s.exStateRecursive(start)
 
