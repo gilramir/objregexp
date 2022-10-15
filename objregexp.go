@@ -101,6 +101,16 @@ func (s *Compiler[T]) RegisterClass(oClass *Class[T]) {
 	s.namespace[oClass.Name] = ccClass
 }
 
+// Creates and registers a user-defined class from the given arguments.
+func (s *Compiler[T]) MakeClass(name string, predicate func(T) bool) {
+
+	class := &Class[T]{
+		Name:    name,
+		Matches: predicate,
+	}
+	s.RegisterClass(class)
+}
+
 // Compile a regex string into a Regexp object.
 // An error is returned if there is a syntax error.
 func (s *Compiler[T]) Compile(text string) (*Regexp[T], error) {
