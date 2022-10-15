@@ -22,7 +22,7 @@ type nfaFactory[T any] struct {
 
 	// stack pointer, and stack, while buildind the NFA stack (regexp)
 	stp   int
-	stack []Frag[T]
+	stack []fragT[T]
 
 	// how many registers are addressed by this regex
 	numRegisters int
@@ -31,7 +31,7 @@ type nfaFactory[T any] struct {
 func newNfaFactory[T any](compiler *Compiler[T]) *nfaFactory[T] {
 	return &nfaFactory[T]{
 		compiler: compiler,
-		stack:    make([]Frag[T], 0),
+		stack:    make([]fragT[T], 0),
 	}
 }
 
@@ -137,12 +137,12 @@ func (s *nfaStateT[T]) ReprN(n int, saw map[*nfaStateT[T]]bool) string {
 	return txt
 }
 
-type Frag[T any] struct {
+type fragT[T any] struct {
 	start *nfaStateT[T]
 	out   []**nfaStateT[T]
 }
 
-func (s *Frag[T]) Repr() string {
+func (s *fragT[T]) Repr() string {
 	out_repr := make([]string, len(s.out))
 	for i, o := range s.out {
 		if *o == nil {
@@ -164,7 +164,7 @@ func (s *nfaFactory[T]) patch(out []**nfaStateT[T], ns *nfaStateT[T]) {
 func (s *nfaFactory[T]) ensure_stack_space() {
 	if len(s.stack) <= s.stp {
 		extra := s.stp - len(s.stack) + 1
-		s.stack = append(s.stack, make([]Frag[T], extra)...)
+		s.stack = append(s.stack, make([]fragT[T], extra)...)
 	}
 }
 
@@ -180,7 +180,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		}
 		ns := nfaStateT[T]{c: ntClass, oClass: class, negation: token.negation,
 			out: nil, out1: nil}
-		s.stack[s.stp] = Frag[T]{&ns, []**nfaStateT[T]{&ns.out}}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
 
@@ -191,7 +191,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		e1 := s.stack[s.stp]
 		// concatenate
 		s.patch(e1.out, e2.start)
-		s.stack[s.stp] = Frag[T]{e1.start, e2.out}
+		s.stack[s.stp] = fragT[T]{e1.start, e2.out}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 2
 		// and added 1
@@ -202,7 +202,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.stp--
 		e1 := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e1.start, out1: e2.start}
-		s.stack[s.stp] = Frag[T]{&ns, append(e1.out, e2.out...)}
+		s.stack[s.stp] = fragT[T]{&ns, append(e1.out, e2.out...)}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 2
 		// and added 1
@@ -211,7 +211,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.stp--
 		e := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e.start}
-		s.stack[s.stp] = Frag[T]{&ns, append(e.out, &ns.out1)}
+		s.stack[s.stp] = fragT[T]{&ns, append(e.out, &ns.out1)}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
@@ -221,7 +221,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		e := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e.start}
 		s.patch(e.out, &ns)
-		s.stack[s.stp] = Frag[T]{&ns, []**nfaStateT[T]{&ns.out1}}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out1}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
@@ -231,14 +231,14 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		e := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e.start}
 		s.patch(e.out, &ns)
-		s.stack[s.stp] = Frag[T]{e.start, []**nfaStateT[T]{&ns.out1}}
+		s.stack[s.stp] = fragT[T]{e.start, []**nfaStateT[T]{&ns.out1}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
 
 	case tAny:
 		ns := nfaStateT[T]{c: ntMeta, meta: mtAny, out: nil, out1: nil}
-		s.stack[s.stp] = Frag[T]{&ns, []**nfaStateT[T]{&ns.out}}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
 
@@ -279,7 +279,7 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 	// stp is where a new item will be placed in the stack.
 	// nfastack must always have allocated space for an item at index 'stp'
 	s.stp = 0
-	s.stack = make([]Frag[T], 1)
+	s.stack = make([]fragT[T], 1)
 
 	for _, token := range tokens {
 		err = s.token2nfa(token)
