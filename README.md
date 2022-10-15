@@ -1,4 +1,5 @@
 # Introduction
+
 Regular expressions are convenient mechanisms for doing some types of parsing
 of strings. But what if you aren't analyzing string?
 "Object" regular expressions are a way to use regular
@@ -13,6 +14,10 @@ which will declare if an object belongs to the class.
 
 Given the classes, you can write regular expressions using basic
 regular expression syntax.
+
+See the [module documentation](https://pkg.go.dev/github.com/gilramir/objregexp)
+
+# The Syntax
 
 In this syntax:
 
