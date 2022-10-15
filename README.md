@@ -174,9 +174,9 @@ For example:
 
         m = regex.Match(objects)
         if m.Success {
-            range = m.Register(1)
+            span := m.Range
             fmt.Println("The non-vowel group is at pos %d - %d",
-                range.Start, range.End)
+                span.Start, span.End)
         }
 ---
 
