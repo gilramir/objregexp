@@ -121,3 +121,13 @@ func (s *Compiler[T]) Compile(text string) (*Regexp[T], error) {
 	factory := newNfaFactory[T](s)
 	return factory.compile(text)
 }
+
+// Compile a regex string into a Regexp object.
+// On error, raises a panic.
+func (s *Compiler[T]) MustCompile(text string) *Regexp[T] {
+	re, err := s.Compile(text)
+	if err != nil {
+		panic(err)
+	}
+	return re
+}
