@@ -26,6 +26,8 @@ func GetDebugLoggerOutput() *log.Logger {
 	return dlog
 }
 
+// The regex compiler. This holds all the user-defined classes
+// that can be used in the regexes.
 type Compiler[T any] struct {
 	finalized bool
 	namespace map[string]ccType
@@ -43,12 +45,15 @@ const (
 	ccExemplar
 )
 
+// Instantiates and initializes a new Compiler.
 func NewCompiler[T any]() *Compiler[T] {
 	s := &Compiler[T]{}
 	s.Initialize()
 	return s
 }
 
+// Initializes a Compiler. Use this if you have allocated
+// a Compiler object already, and only need to Initialize it.
 func (s *Compiler[T]) Initialize() {
 	s.assertNotFinalized()
 
@@ -72,11 +77,14 @@ func (s *Compiler[T]) assertNotFinalized() {
 	}
 }
 
+// After registering all the classes, you must call Finalize() so
+// Compile() can then be used.
 func (s *Compiler[T]) Finalize() {
 	s.assertNotFinalized()
 	s.finalized = true
 }
 
+// Registers a user-defined class.
 func (s *Compiler[T]) RegisterClass(oClass *Class[T]) {
 
 	if t, has := s.namespace[oClass.Name]; has {
@@ -93,8 +101,12 @@ func (s *Compiler[T]) RegisterClass(oClass *Class[T]) {
 	s.namespace[oClass.Name] = ccClass
 }
 
+// Compile a regex string into a Regexp object.
+// An error is returned if there is a syntax error.
 func (s *Compiler[T]) Compile(text string) (*Regexp[T], error) {
-	s.assertFinalized()
+	if !s.finalized {
+		return nil, fmt.Errorf("The objregexp.Compiler is not finalized. Call Finalize().")
+	}
 
 	factory := newNfaFactory[T](s)
 	return factory.compile(text)

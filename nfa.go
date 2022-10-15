@@ -58,9 +58,9 @@ const (
 	mtAny metaType = iota + 1
 )
 
-// Important - once a regex is compiled, nothing in a stateT can change.
+// Important - once a regex is compiled, nothing in a nfaStateT can change.
 // Otherwise, a single regex cannot be used in multiple concurrent goroutines
-type stateT[T any] struct {
+type nfaStateT[T any] struct {
 	c nodeType
 
 	// oClass is set if c is ntClass
@@ -70,7 +70,7 @@ type stateT[T any] struct {
 	meta metaType
 	//	register int
 
-	out, out1 *stateT[T]
+	out, out1 *nfaStateT[T]
 
 	// At this node, which registers start collecting
 	// (an open paren) and which ones stop collection
@@ -79,7 +79,7 @@ type stateT[T any] struct {
 	endsRegisters   []int
 }
 
-func stateListRepr[T any](stateList []*stateT[T]) string {
+func stateListRepr[T any](stateList []*nfaStateT[T]) string {
 	labels := make([]string, len(stateList))
 	for i, ns := range stateList {
 		labels[i] = ns.Repr0()
@@ -87,7 +87,7 @@ func stateListRepr[T any](stateList []*stateT[T]) string {
 	return fmt.Sprintf("[%s]", strings.Join(labels, ", "))
 }
 
-func (s *stateT[T]) Repr0() string {
+func (s *nfaStateT[T]) Repr0() string {
 	var label string
 	switch s.c {
 	case ntMatch:
@@ -116,12 +116,12 @@ func (s *stateT[T]) Repr0() string {
 		s.startsRegisters, s.endsRegisters)
 }
 
-func (s *stateT[T]) Repr() string {
-	saw := make(map[*stateT[T]]bool)
+func (s *nfaStateT[T]) Repr() string {
+	saw := make(map[*nfaStateT[T]]bool)
 	return s.ReprN(0, saw)
 }
 
-func (s *stateT[T]) ReprN(n int, saw map[*stateT[T]]bool) string {
+func (s *nfaStateT[T]) ReprN(n int, saw map[*nfaStateT[T]]bool) string {
 	// Don't record MATCH as seen; we always want to display it
 	if s.c != ntMatch {
 		saw[s] = true
@@ -138,8 +138,8 @@ func (s *stateT[T]) ReprN(n int, saw map[*stateT[T]]bool) string {
 }
 
 type Frag[T any] struct {
-	start *stateT[T]
-	out   []**stateT[T]
+	start *nfaStateT[T]
+	out   []**nfaStateT[T]
 }
 
 func (s *Frag[T]) Repr() string {
@@ -155,7 +155,7 @@ func (s *Frag[T]) Repr() string {
 }
 
 /* Patch the list of states at out to point to s. */
-func (s *nfaFactory[T]) patch(out []**stateT[T], ns *stateT[T]) {
+func (s *nfaFactory[T]) patch(out []**nfaStateT[T], ns *nfaStateT[T]) {
 	for _, p := range out {
 		*p = ns
 	}
@@ -178,9 +178,9 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		if !has {
 			return fmt.Errorf("No such class name '%s' at pos %d", token.name, token.pos)
 		}
-		ns := stateT[T]{c: ntClass, oClass: class, negation: token.negation,
+		ns := nfaStateT[T]{c: ntClass, oClass: class, negation: token.negation,
 			out: nil, out1: nil}
-		s.stack[s.stp] = Frag[T]{&ns, []**stateT[T]{&ns.out}}
+		s.stack[s.stp] = Frag[T]{&ns, []**nfaStateT[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
 
@@ -201,7 +201,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		e2 := s.stack[s.stp]
 		s.stp--
 		e1 := s.stack[s.stp]
-		ns := stateT[T]{c: ntSplit, out: e1.start, out1: e2.start}
+		ns := nfaStateT[T]{c: ntSplit, out: e1.start, out1: e2.start}
 		s.stack[s.stp] = Frag[T]{&ns, append(e1.out, e2.out...)}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 2
@@ -210,7 +210,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 	case tGlobQuestion: // 0 or 1
 		s.stp--
 		e := s.stack[s.stp]
-		ns := stateT[T]{c: ntSplit, out: e.start}
+		ns := nfaStateT[T]{c: ntSplit, out: e.start}
 		s.stack[s.stp] = Frag[T]{&ns, append(e.out, &ns.out1)}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
@@ -219,9 +219,9 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 	case tGlobStar: // 0 or more
 		s.stp--
 		e := s.stack[s.stp]
-		ns := stateT[T]{c: ntSplit, out: e.start}
+		ns := nfaStateT[T]{c: ntSplit, out: e.start}
 		s.patch(e.out, &ns)
-		s.stack[s.stp] = Frag[T]{&ns, []**stateT[T]{&ns.out1}}
+		s.stack[s.stp] = Frag[T]{&ns, []**nfaStateT[T]{&ns.out1}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
@@ -229,16 +229,16 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 	case tGlobPlus: // 1 or more
 		s.stp--
 		e := s.stack[s.stp]
-		ns := stateT[T]{c: ntSplit, out: e.start}
+		ns := nfaStateT[T]{c: ntSplit, out: e.start}
 		s.patch(e.out, &ns)
-		s.stack[s.stp] = Frag[T]{e.start, []**stateT[T]{&ns.out1}}
+		s.stack[s.stp] = Frag[T]{e.start, []**nfaStateT[T]{&ns.out1}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
 
 	case tAny:
-		ns := stateT[T]{c: ntMeta, meta: mtAny, out: nil, out1: nil}
-		s.stack[s.stp] = Frag[T]{&ns, []**stateT[T]{&ns.out}}
+		ns := nfaStateT[T]{c: ntMeta, meta: mtAny, out: nil, out1: nil}
+		s.stack[s.stp] = Frag[T]{&ns, []**nfaStateT[T]{&ns.out}}
 		s.stp++
 		s.ensure_stack_space()
 

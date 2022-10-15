@@ -16,7 +16,7 @@ type executorT[T any] struct {
 
 	// Every State should have only 1 copy as an exState, so we need this
 	// cache
-	stCache map[*stateT[T]]*exStateT[T]
+	stCache map[*nfaStateT[T]]*exStateT[T]
 
 	matchstate *exStateT[T]
 }
@@ -25,14 +25,14 @@ type executorT[T any] struct {
 func (s *executorT[T]) Initialize(regex *Regexp[T]) {
 	s.regex = regex
 	s.listid = 0
-	s.stCache = make(map[*stateT[T]]*exStateT[T])
+	s.stCache = make(map[*nfaStateT[T]]*exStateT[T])
 	s.matchstate = s.exState(&regex.matchstate)
 }
 
 // This mirrors a state object, but it's modifiable so that the same
 // Regexp object (State) can be used in multiple concrent goroutines
 type exStateT[T any] struct {
-	st *stateT[T]
+	st *nfaStateT[T]
 
 	// for the nfa
 	lastlist int
@@ -60,12 +60,12 @@ func (s *registersT) Copy() *registersT {
 	return r
 }
 
-func (s *executorT[T]) exStateRecursive(state *stateT[T]) *exStateT[T] {
+func (s *executorT[T]) exStateRecursive(state *nfaStateT[T]) *exStateT[T] {
 
 	return s.exState(state)
 }
 
-func (s *executorT[T]) exState(state *stateT[T]) *exStateT[T] {
+func (s *executorT[T]) exState(state *nfaStateT[T]) *exStateT[T] {
 	if state == nil {
 		return nil
 	}
@@ -118,7 +118,7 @@ type hitT[T any] struct {
 // Walk the list of states, which can expand into branches.
 // If full is true, wait until the end of the string to check for a final match
 // If full is false, return true as soon as a match is found
-func (s *executorT[T]) match(start *stateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
+func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
 
 	xstart := s.exStateRecursive(start)
 
