@@ -121,10 +121,13 @@ type hitT[T comparable] struct {
 func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
 	ok, count, xns := s._match(start, input, from, full)
 	if ok {
-		// sanity check
+		// It's possible for us to have -1's on one side (start/end)
+		// of the range of a register. That's ok, but we need to clean
+		// them up.
 		for i, reg := range xns.registers.ranges {
+			dlog.Printf("checking reg %d: %+v\n", i+1, reg)
 			if reg.End == -1 {
-				reg.Start = -1
+				xns.registers.ranges[i].Start = -1
 				/*
 					if reg.Start != -1 {
 						msg := fmt.Sprintf("Reg %d is %+v", i+1, reg)
@@ -132,10 +135,13 @@ func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool
 					}
 				*/
 			} else if reg.Start == -1 {
-				if reg.End != -1 {
-					msg := fmt.Sprintf("Reg %d is %+v", i+1, reg)
-					panic(msg)
-				}
+				xns.registers.ranges[i].End = -1
+				/*
+					if reg.End != -1 {
+						msg := fmt.Sprintf("Reg %d is %+v", i+1, reg)
+						panic(msg)
+					}
+				*/
 			}
 		}
 	}

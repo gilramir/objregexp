@@ -72,6 +72,7 @@ func (s Range) Length() int {
 	return s.End - s.Start
 }
 
+// Is there anything in the range?
 func (s Range) Empty() bool {
 	return s.End-s.Start == 0
 }
@@ -90,6 +91,11 @@ type Match struct {
 
 func (s Match) Length() int {
 	return s.Range.Length()
+}
+
+func (s Match) HasRegister(n int) bool {
+	reg := s.Register(n)
+	return reg.Start != -1 && reg.End != -1
 }
 
 // Get a numbered register from the Match. Every left parenthesis
