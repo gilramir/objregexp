@@ -9,27 +9,19 @@ import (
 	"unicode/utf8"
 )
 
-// Parse the regular expression string
-//
-// classgroup		[:alpha:,:beta:]
-// lparen		( or (?P<name>
-// rparen		)
-// curlies		{1} or {1,2}
-
 type tokenType string
 
 // The token types
 const (
-	tError         tokenType = "E"
-	tClass                   = "C" // [:alpha:]
-	tConcat                  = "." // concatenate, for internal postfix notation
-	tAlternate               = "|" // alternate choices
-	tGlobStar                = "*" // *
-	tGlobPlus                = "+" // +
-	tGlobQuestion            = "?" // ?
-	tAny                     = "A" // .
-	tStartRegister           = "(" // Record info about the open paren
-	tEndRegister             = ")" // Record info about the close paren
+	tError        tokenType = "E"
+	tClass                  = "C" // [:alpha:]
+	tConcat                 = "." // concatenate, for internal postfix notation
+	tAlternate              = "|" // alternate choices
+	tGlobStar               = "*" // *
+	tGlobPlus               = "+" // +
+	tGlobQuestion           = "?" // ?
+	tAny                    = "A" // .
+	tEndRegister            = ")" // Record info about the close paren
 )
 
 type tokenT struct {
@@ -43,16 +35,34 @@ type tokenT struct {
 	// negation is only used For tClass
 	negation bool
 
-	// For tStartReg and tEndReg, int1 holds the register number
+	// For tEndReg, int1 holds the register number
 	int1 int
 	//int2 int
+
+	// start capturing a register from this position onwards
+	startRegisters []int
+	// stop capturing  a register after this position
+	endRegisters []int
 
 	err error
 }
 
+func makeTokensString(tokens []tokenT) string {
+	text := ""
+	for _, t := range tokens {
+		text += string(t.ttype)
+	}
+	return text
+}
+
+func (s *tokenT) Repr() string {
+	return fmt.Sprintf("<tokenT %s name:%s neg:%t pos:%d int1:%d sr:%v er:%v>",
+		s.ttype, s.name, s.negation, s.pos, s.int1, s.startRegisters, s.endRegisters)
+}
+
 func printTokens(tokens []tokenT) {
 	for i, t := range tokens {
-		dlog.Printf("#%d. %+v", i, t)
+		dlog.Printf("#%d. %s", i, t.Repr())
 	}
 }
 
@@ -64,6 +74,7 @@ func parseRegex(restring string) ([]tokenT, error) {
 	tokens := make([]tokenT, 0)
 	go pstate.goparse()
 
+	//	nonStarts := 0
 	for token := range pstate.tokenChan {
 		switch token.ttype {
 		case tError:
@@ -78,6 +89,11 @@ func parseRegex(restring string) ([]tokenT, error) {
 		}
 	}
 	pstate.wg.Wait()
+
+	// Here can we clean up the start/end register tokens?
+	//printTokens(tokens)
+	//dlog.Printf("")
+
 	return tokens, nil
 }
 
@@ -189,20 +205,7 @@ func (s *reParserState) goparse() {
 
 func (s *reParserState) parseLParen() {
 
-	// First emit the tStartRegister
-	/*
-		if s.natom > 1 {
-			s.natom--
-			s.emitConcatenation()
-		}
-	*/
 	s.groupNumsAllocated++
-	s.tokenChan <- tokenT{
-		ttype: tStartRegister,
-		pos:   s.pos,
-		int1:  s.groupNumsAllocated,
-	}
-	//	s.natom++
 
 	// Then do the regular LParen logic
 	if s.natom > 1 {
@@ -213,7 +216,7 @@ func (s *reParserState) parseLParen() {
 	s.p[s.j].nbin = s.nbin
 	s.p[s.j].natom = s.natom
 	s.p[s.j].beforeGroupNum = s.groupNumsAllocated
-	dlog.Printf("pstack %d => %+v", s.j, s.p[s.j])
+	//dlog.Printf("pstack %d => %+v", s.j, s.p[s.j])
 	s.j++
 	s.ensure_stack_space()
 	s.nbin = 0
@@ -238,9 +241,13 @@ func (s *reParserState) parseRParen() {
 		s.emitErrorf("Close paren ')' at pos %d doesn't follow an opening paren.", s.pos)
 		return
 	}
+
+	dlog.Printf(") => atoms %d nbins %d", s.natom, s.nbin)
+
 	for s.natom--; s.natom > 0; s.natom-- {
 		s.emitConcatenation()
 	}
+
 	for ; s.nbin > 0; s.nbin-- {
 		s.emitAlternation()
 	}
@@ -250,18 +257,12 @@ func (s *reParserState) parseRParen() {
 	s.natom++
 
 	// Now emit the tEndRegister
-	/*
-		if s.natom > 1 {
-			s.natom--
-			s.emitConcatenation()
-		}
-	*/
 	s.tokenChan <- tokenT{
-		ttype: tEndRegister,
-		pos:   s.pos,
-		int1:  s.p[s.j].beforeGroupNum,
+		ttype:        tEndRegister,
+		pos:          s.pos,
+		int1:         s.p[s.j].beforeGroupNum,
+		endRegisters: []int{s.p[s.j].beforeGroupNum},
 	}
-	//	s.natom++
 }
 
 func (s *reParserState) parseGlob(r rune) {

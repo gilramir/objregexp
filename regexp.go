@@ -137,7 +137,6 @@ func (s *Regexp[T]) matchAt(input []T, start int, full bool) Match {
 	var executor executorT[T]
 	executor.Initialize(s)
 
-	//vars := make(map[string]Range)
 	matched, n, xns := executor.match(s.nfa, input, start, full)
 	if matched {
 		m := Match{

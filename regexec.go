@@ -41,21 +41,27 @@ type exStateT[T comparable] struct {
 	prev *exStateT[T]
 
 	out, out1 *exStateT[T]
-
-	registers *registersT
 }
 
 type registersT struct {
-	active []bool
 	ranges []Range
+}
+
+func (s *executorT[T]) newRegisters() *registersT {
+	r := &registersT{
+		ranges: make([]Range, s.regex.numRegisters),
+	}
+	for i := 0; i < s.regex.numRegisters; i++ {
+		r.ranges[i].Start = -1
+		r.ranges[i].End = -1
+	}
+	return r
 }
 
 func (s *registersT) Copy() *registersT {
 	r := &registersT{
-		active: make([]bool, len(s.active)),
 		ranges: make([]Range, len(s.ranges)),
 	}
-	copy(r.active, s.active)
 	copy(r.ranges, s.ranges)
 	return r
 }
@@ -73,8 +79,7 @@ func (s *executorT[T]) exState(state *nfaStateT[T]) *exStateT[T] {
 		return xs
 	}
 	xs := &exStateT[T]{
-		st:        state,
-		registers: s.newRegisters(),
+		st: state,
 	}
 	s.stCache[state] = xs
 
@@ -84,22 +89,32 @@ func (s *executorT[T]) exState(state *nfaStateT[T]) *exStateT[T] {
 
 	return xs
 }
-func (s *executorT[T]) newRegisters() *registersT {
-	r := &registersT{
-		active: make([]bool, s.regex.numRegisters),
-		ranges: make([]Range, s.regex.numRegisters),
-	}
-	for i := 0; i < s.regex.numRegisters; i++ {
-		r.ranges[i].Start = -1
-		r.ranges[i].End = -1
-	}
-	return r
-}
 
 // A few data dumpers
 
 func (s *exStateT[T]) Repr0() string {
-	return fmt.Sprintf("<exStateT %s reg:+%v>", s.st.Repr0(), s.registers.ranges)
+	return fmt.Sprintf("<exStateT %s>", s.st.Repr0())
+}
+
+func (s *exStateT[T]) Repr() string {
+	saw := make(map[*exStateT[T]]bool)
+	return s.ReprN(0, saw)
+}
+
+func (s *exStateT[T]) ReprN(n int, saw map[*exStateT[T]]bool) string {
+	// Don't record MATCH as seen; we always want to display it
+	if s.st.c != ntMatch {
+		saw[s] = true
+	}
+	indent := strings.Repeat("  ", n)
+	txt := fmt.Sprintf("%s%s", indent, s.Repr0())
+	if s.out != nil && !saw[s.out] {
+		txt += "\n" + s.out.ReprN(n+1, saw)
+	}
+	if s.out1 != nil && !saw[s.out1] {
+		txt += "\n" + s.out1.ReprN(n+1, saw)
+	}
+	return txt
 }
 
 func exStateListRepr[T comparable](exStateList []*exStateT[T]) string {
@@ -111,14 +126,14 @@ func exStateListRepr[T comparable](exStateList []*exStateT[T]) string {
 }
 
 type hitT[T comparable] struct {
-	x      *exStateT[T]
+	x      *nfaRegStateT[T]
 	length int
 }
 
 // Walk the list of states, which can expand into branches.
 // If full is true, wait until the end of the string to check for a final match
 // If full is false, return true as soon as a match is found
-func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
+func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *nfaRegStateT[T]) {
 	ok, count, xns := s._match(start, input, from, full)
 	if ok {
 		// It's possible for us to have -1's on one side (start/end)
@@ -126,40 +141,30 @@ func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool
 		// them up.
 		for i, reg := range xns.registers.ranges {
 			dlog.Printf("checking reg %d: %+v\n", i+1, reg)
+			// TODO - is this situation still possible?
 			if reg.End == -1 {
 				xns.registers.ranges[i].Start = -1
-				/*
-					if reg.Start != -1 {
-						msg := fmt.Sprintf("Reg %d is %+v", i+1, reg)
-						panic(msg)
-					}
-				*/
 			} else if reg.Start == -1 {
 				xns.registers.ranges[i].End = -1
-				/*
-					if reg.End != -1 {
-						msg := fmt.Sprintf("Reg %d is %+v", i+1, reg)
-						panic(msg)
-					}
-				*/
 			}
 		}
 	}
 	return ok, count, xns
 }
 
-func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *exStateT[T]) {
+type nfaRegStateT[T comparable] struct {
+	root      *exStateT[T]
+	registers *registersT
+}
+
+func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *nfaRegStateT[T]) {
 
 	xstart := s.exStateRecursive(start)
 
-	// Any starting registers?
-	for _, rn := range s.regex.startRegisters {
-		xstart.registers.ranges[rn-1].Start = 0
-	}
-
-	var clist, nlist []*exStateT[T]
+	var clist, nlist []*nfaRegStateT[T]
 	s.listid++
-	clist = s.addstate(clist, xstart)
+	// first pos is = -1, in case SPLIT is the 1st nfa node
+	clist = s.addstate(-1, clist, &nfaRegStateT[T]{xstart, s.newRegisters()})
 
 	// Keep track of matches because we want to be a little greedy
 	// and not return too early
@@ -167,15 +172,19 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 
 	for i := from; i < len(input); i++ {
 		ch := input[i]
-		dlog.Printf("Input #%d: %v: clist=%s nlist=%s",
-			i, ch, exStateListRepr(clist),
-			exStateListRepr(nlist))
+		dlog.Printf("=========================================")
+		dlog.Printf("Input #%d: %v", i, ch)
+		dlog.Printf("clist has %d items:", len(clist))
+		for cxi, cxsr := range clist {
+			cxs := cxsr.root
+			dlog.Printf("clist item #%d regs:%v\n%s", cxi, cxsr.registers.ranges, cxs.Repr())
+		}
 		nlist = s.step(i, clist, ch, nlist)
 		clist, nlist = nlist, clist
-		dlog.Printf("\tnew clist: %s", exStateListRepr(clist))
+		//		dlog.Printf("\tnew clist: %s", exStateListRepr(clist))
 
 		if !full {
-			if matched, xns := s.ismatch(clist); matched {
+			if matched, xns := s.ismatch(i+1, clist); matched {
 				hit = hitT[T]{x: xns, length: i - from + 1}
 				dlog.Printf("MATCHED and stored hit %+v", hit)
 				// keep going
@@ -190,7 +199,7 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 	}
 	if full {
 		// If looking for a full match, did we match at the end?
-		if matched, xns := s.ismatch(clist); matched {
+		if matched, xns := s.ismatch(len(input)-from, clist); matched {
 			return true, len(input) - from, xns
 		} else {
 			return false, 0, nil
@@ -207,22 +216,37 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 	}
 }
 
-// Add s to l, following unlabeled arrows.
-func (s *executorT[T]) addstate(l []*exStateT[T], ns *exStateT[T]) []*exStateT[T] {
+// Add ns to l, following unlabeled arrows.
+func (s *executorT[T]) addstate(pos int, l []*nfaRegStateT[T], nsx *nfaRegStateT[T]) []*nfaRegStateT[T] {
+	ns := nsx.root
+	regs := nsx.registers
 	if ns == nil || ns.lastlist == s.listid {
 		return l
 	}
 	ns.lastlist = s.listid
+	dlog.Printf("in addstate, ns=%s l list has %d items:", ns.Repr0(), len(l))
+	for li, lnx := range l {
+		lx := lnx.root
+		dlog.Printf("l #%d: reg:%v\n%s", li, lnx.registers.ranges, lx.Repr())
+	}
 	if ns.st.c == ntSplit {
-		fmt.Sprintf("Split %s -> %s and %s\n", ns.Repr0(), ns.out.Repr0(), ns.out1.Repr0())
-		ns.out.registers = ns.registers.Copy()
-		ns.out1.registers = ns.registers.Copy()
-		l = s.addstate(l, ns.out)
-		l = s.addstate(l, ns.out1)
+		for _, rn := range ns.st.startsRegisters {
+			dlog.Printf("addstate setting start reg #%d = pos %d", rn, pos)
+			// The matching character starts this register
+			regs.ranges[rn-1].Start = pos + 1
+		}
+		for _, rn := range ns.st.endsRegisters {
+			dlog.Printf("addstate setting end reg #%d = pos %d", rn, pos)
+			// The end paren is this pos, but we record pos+1
+			// to be more like Go slices
+			regs.ranges[rn-1].End = pos + 1
+		}
+		l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out, nsx.registers.Copy()})
+		l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out1, nsx.registers.Copy()})
 	}
 	// TODO - I'm not sure why we append ns here if ns == NSPlit. Is it
 	// necessary?
-	l = append(l, ns)
+	l = append(l, nsx)
 	return l
 }
 
@@ -231,17 +255,30 @@ func (s *executorT[T]) addstate(l []*exStateT[T], ns *exStateT[T]) []*exStateT[T
  * past the character ch,
  * to create next NFA state set nlist.
  */
-func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStateT[T]) []*exStateT[T] {
+func (s *executorT[T]) step(pos int, clist []*nfaRegStateT[T], ch T, nlist []*nfaRegStateT[T]) []*nfaRegStateT[T] {
 	s.listid++
 	nlist = nlist[:0]
-	dlog.Printf("step @ %d: clist has %d : %s", pos, len(clist), exStateListRepr(clist))
-	for ci, xns := range clist {
+	dlog.Printf("step @ %d: clist has %d items", pos, len(clist))
+	for li, lnx := range clist {
+		lx := lnx.root
+		dlog.Printf("clist #%d: reg:%v\n%s", li, lnx.registers.ranges, lx.Repr())
+	}
+	for ci, xnsr := range clist {
+		xns := xnsr.root
+		regs := xnsr.registers
 		dlog.Printf("looking at clist #%d: %s", ci, xns.Repr0())
 		ns := xns.st
 		var matches bool
 		switch ns.c {
 		default:
-			dlog.Printf("<skipping>")
+			switch ns.c {
+			case ntMatch:
+				dlog.Printf("<skipping ntMatch>")
+			case ntSplit:
+				dlog.Printf("<skipping ntPslit>")
+			default:
+				dlog.Printf("<skipping ? %d>", ns.c)
+			}
 			continue
 		case ntClass:
 			matches = ns.oClass.Matches(ch)
@@ -253,7 +290,7 @@ func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStat
 			}
 		case ntIdentity:
 			matches = ns.iObj == ch
-			dlog.Printf("Identiy %s: %v", ns.iName, matches)
+			dlog.Printf("Identity %s: %v", ns.cName, matches)
 			// Are we testing for non-memberhood?
 			if ns.negation {
 				matches = !matches
@@ -270,32 +307,35 @@ func (s *executorT[T]) step(pos int, clist []*exStateT[T], ch T, nlist []*exStat
 		}
 		if matches {
 
+			dlog.Printf("matched : %s", xns.Repr0())
 			for _, rn := range ns.startsRegisters {
-				// The matching character would be 1 after this pos
-				xns.registers.ranges[rn-1].Start = pos + 1
+				// The matching character starts this register
+				regs.ranges[rn-1].Start = pos
 			}
 			for _, rn := range ns.endsRegisters {
 				// The end paren is this pos, but we record pos+1
 				// to be more like Go slices
-				xns.registers.ranges[rn-1].End = pos + 1
+				regs.ranges[rn-1].End = pos
 			}
-
-			dlog.Printf("match; calling addstate()")
-			// Copy the previous registers
-			xns.out.registers = xns.registers.Copy()
-			dlog.Printf("new registers: %+v", xns.out.registers.ranges)
-			nlist = s.addstate(nlist, xns.out)
+			dlog.Printf("This nfa's registers: %v\n", regs.ranges)
+			nlist = s.addstate(pos, nlist, &nfaRegStateT[T]{xns.out, regs.Copy()})
 		}
 	}
 	return nlist
 }
 
 // Check whether state list contains a match.
-func (s *executorT[T]) ismatch(l []*exStateT[T]) (bool, *exStateT[T]) {
-	for _, ns := range l {
+func (s *executorT[T]) ismatch(pos int, l []*nfaRegStateT[T]) (bool, *nfaRegStateT[T]) {
+	for _, nsr := range l {
+		ns := nsr.root
+		regs := nsr.registers
 		if ns == s.matchstate {
-			dlog.Printf("matched; registers: %+v", ns.registers.ranges)
-			return true, ns
+			for _, rn := range ns.st.endsRegisters {
+				dlog.Printf("ismatch setting end reg #%d = pos %d", rn, pos)
+				regs.ranges[rn-1].End = pos
+			}
+			dlog.Printf("matched; registers: %+v", nsr.registers.ranges)
+			return true, nsr
 		}
 	}
 	return false, nil

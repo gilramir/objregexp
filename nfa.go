@@ -27,10 +27,6 @@ type nfaFactory[T comparable] struct {
 
 	// how many registers are addressed by this regex
 	numRegisters int
-
-	// the register numbers that start at the beginning
-	// of the regex, before any other tokens
-	startRegisters []int
 }
 
 func newNfaFactory[T comparable](compiler *Compiler[T]) *nfaFactory[T] {
@@ -80,9 +76,11 @@ type nfaStateT[T comparable] struct {
 	// oClass is set if c is ntClass
 	oClass *Class[T]
 
-	// iObj and iName are set if c is ntIdentity
-	iObj  T
-	iName string
+	// iObj is set if c is ntIdentity
+	iObj T
+
+	// cName is set if c is ntClass or ntIdentity
+	cName string
 
 	// negation is valid for either oClass or iObj
 	negation bool
@@ -97,6 +95,9 @@ type nfaStateT[T comparable] struct {
 	// (a closed paren)
 	startsRegisters []int
 	endsRegisters   []int
+
+	sRegPosOffsets []int
+	eRegPosOffsets []int
 }
 
 func stateListRepr[T comparable](stateList []*nfaStateT[T]) string {
@@ -130,12 +131,43 @@ func (s *nfaStateT[T]) Repr0() string {
 		}
 	case ntIdentity:
 		if s.negation {
-			label = "!" + s.iName
+			label = "!" + s.cName
 		} else {
-			label = s.iName
+			label = s.cName
 		}
 	}
 	return fmt.Sprintf("<State %s sr:%v er:%v>", label,
+		s.startsRegisters, s.endsRegisters)
+}
+func (s *nfaStateT[T]) Repr0Dot() string {
+	var label string
+	switch s.c {
+	case ntMatch:
+		label = "MATCH"
+	case ntSplit:
+		label = "SPLIT"
+	case ntMeta:
+		switch s.meta {
+		case mtAny:
+			label = "ANY"
+		default:
+			label = "MT?"
+		}
+
+	case ntClass:
+		if s.negation {
+			label = "!" + s.oClass.Name
+		} else {
+			label = s.oClass.Name
+		}
+	case ntIdentity:
+		if s.negation {
+			label = "!" + s.cName
+		} else {
+			label = s.cName
+		}
+	}
+	return fmt.Sprintf("State %s\\nsr:%v er:%v", label,
 		s.startsRegisters, s.endsRegisters)
 }
 
@@ -151,7 +183,6 @@ func (s *nfaStateT[T]) ReprN(n int, saw map[*nfaStateT[T]]bool) string {
 	}
 	indent := strings.Repeat("  ", n)
 	txt := fmt.Sprintf("%s%s", indent, s.Repr0())
-	saw[s] = true
 	if s.out != nil && !saw[s.out] {
 		txt += "\n" + s.out.ReprN(n+1, saw)
 	}
@@ -163,7 +194,7 @@ func (s *nfaStateT[T]) ReprN(n int, saw map[*nfaStateT[T]]bool) string {
 
 // Write the NFA to a dot file, for visualization with graphviz
 func (s *nfaStateT[T]) writeDot(saw map[*nfaStateT[T]]bool, fh io.Writer) error {
-	_, err := fmt.Fprintf(fh, "\tN%p [label=\"%s\"]\n", s, s.Repr0())
+	_, err := fmt.Fprintf(fh, "\tN%p [label=\"%s\"]\n", s, s.Repr0Dot())
 	if err != nil {
 		return err
 	}
@@ -193,101 +224,14 @@ func (s *nfaStateT[T]) writeDot(saw map[*nfaStateT[T]]bool, fh io.Writer) error 
 	return err
 }
 
-func (s *nfaStateT[T]) fixRegistersRecursive(saw map[*nfaStateT[T]]bool) {
-	saw[s] = true
-	if s.c == ntSplit {
-		if len(s.startsRegisters) > 0 {
-			// We need to push these out
-			pushSaw := make(map[*nfaStateT[T]]bool)
-			if !saw[s.out] {
-				s.out.pushStartRegistersRecursive(pushSaw, s.startsRegisters)
-				//saw[s.out] = true
-			}
-			if !saw[s.out1] {
-				s.out1.pushStartRegistersRecursive(pushSaw, s.startsRegisters)
-				//saw[s.out1] = true
-			}
-			// clear the slice
-			s.startsRegisters = s.startsRegisters[:0]
-		}
-		if len(s.endsRegisters) > 0 {
-			// We need to push these out
-			pushSaw := make(map[*nfaStateT[T]]bool)
-			if !saw[s.out] {
-				s.out.pushEndRegistersRecursive(pushSaw, s.endsRegisters)
-				//saw[s.out] = true
-			}
-			if !saw[s.out1] {
-				s.out1.pushEndRegistersRecursive(pushSaw, s.endsRegisters)
-				//saw[s.out1] = true
-			}
-			// clear the slice
-			s.endsRegisters = s.endsRegisters[:0]
-		}
-	}
-
-	if s.out != nil && !saw[s.out] {
-		s.out.fixRegistersRecursive(saw)
-	}
-	if s.out1 != nil && !saw[s.out1] {
-		s.out.fixRegistersRecursive(saw)
-	}
-
-}
-
-func (s *nfaStateT[T]) pushStartRegistersRecursive(saw map[*nfaStateT[T]]bool, er []int) {
-	if saw[s] {
-		return
-	}
-	saw[s] = true
-
-	if s.c == ntSplit {
-		s.out.pushStartRegistersRecursive(saw, er)
-		s.out1.pushStartRegistersRecursive(saw, er)
-		return
-	} else {
-		for _, reg := range er {
-			has := false
-			for _, xreg := range s.startsRegisters {
-				if xreg == reg {
-					has = true
-				}
-			}
-			if !has {
-				s.startsRegisters = append(s.startsRegisters, reg)
-			}
-		}
-	}
-}
-
-func (s *nfaStateT[T]) pushEndRegistersRecursive(saw map[*nfaStateT[T]]bool, er []int) {
-	if saw[s] {
-		return
-	}
-	saw[s] = true
-
-	if s.c == ntSplit {
-		s.out.pushEndRegistersRecursive(saw, er)
-		s.out1.pushEndRegistersRecursive(saw, er)
-		return
-	} else {
-		for _, reg := range er {
-			has := false
-			for _, xreg := range s.endsRegisters {
-				if xreg == reg {
-					has = true
-				}
-			}
-			if !has {
-				s.endsRegisters = append(s.endsRegisters, reg)
-			}
-		}
-	}
-}
-
 type fragT[T comparable] struct {
+	// The start node of the fragment
 	start *nfaStateT[T]
-	out   []**nfaStateT[T]
+	// The out's that need connections
+	out []**nfaStateT[T]
+
+	// the endsRegisters to place on the outs after they are connected
+	endsRegisters []int
 }
 
 func (s *fragT[T]) Repr() string {
@@ -299,12 +243,15 @@ func (s *fragT[T]) Repr() string {
 			out_repr[i] = (*o).Repr()
 		}
 	}
-	return fmt.Sprintf("start: %s out: %v", s.start.Repr(), out_repr)
+	return fmt.Sprintf("start: %s out: %v er: %v", s.start.Repr(), out_repr, s.endsRegisters)
 }
 
 /* Patch the list of states at out to point to s. */
-func (s *nfaFactory[T]) patch(out []**nfaStateT[T], ns *nfaStateT[T]) {
+func (s *nfaFactory[T]) patch(f fragT[T], out []**nfaStateT[T], ns *nfaStateT[T]) {
 	for _, p := range out {
+		if len(f.endsRegisters) > 0 {
+			ns.endsRegisters = append(ns.endsRegisters, f.endsRegisters...)
+		}
 		*p = ns
 	}
 }
@@ -316,9 +263,11 @@ func (s *nfaFactory[T]) ensure_stack_space() {
 	}
 }
 
-func (s *nfaFactory[T]) token2nfa(token tokenT) error {
+func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 
-	dlog.Printf("token2nfa: %+v", token)
+	dlog.Printf("---------------------")
+	dlog.Printf("token2nfa: #%d %s", tnum, token.Repr())
+	dlog.Printf("stack:\n%s", s.stackRepr())
 	switch token.ttype {
 
 	case tClass: // could be a Class or an identity
@@ -333,17 +282,17 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 			if !has {
 				panic(fmt.Sprintf("Should have found class '%s' at pos %d", token.name, token.pos))
 			}
-			ns = nfaStateT[T]{c: ntClass, oClass: class, negation: token.negation,
+			ns = nfaStateT[T]{c: ntClass, oClass: class, cName: token.name, negation: token.negation,
 				out: nil, out1: nil}
 		case ccIdentity:
 			obj, has := s.compiler.identityObj[token.name]
 			if !has {
 				panic(fmt.Sprintf("Should have found identity '%s' at pos %d", token.name, token.pos))
 			}
-			ns = nfaStateT[T]{c: ntIdentity, iObj: obj, iName: token.name, negation: token.negation,
+			ns = nfaStateT[T]{c: ntIdentity, iObj: obj, cName: token.name, negation: token.negation,
 				out: nil, out1: nil}
 		}
-		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
 		s.stp++
 		s.ensure_stack_space()
 
@@ -353,8 +302,8 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.stp--
 		e1 := s.stack[s.stp]
 		// concatenate
-		s.patch(e1.out, e2.start)
-		s.stack[s.stp] = fragT[T]{e1.start, e2.out}
+		s.patch(e1, e1.out, e2.start)
+		s.stack[s.stp] = fragT[T]{e1.start, e2.out, e2.endsRegisters}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 2
 		// and added 1
@@ -365,7 +314,7 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.stp--
 		e1 := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e1.start, out1: e2.start}
-		s.stack[s.stp] = fragT[T]{&ns, append(e1.out, e2.out...)}
+		s.stack[s.stp] = fragT[T]{&ns, append(e1.out, e2.out...), []int{}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 2
 		// and added 1
@@ -374,7 +323,13 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.stp--
 		e := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e.start}
-		s.stack[s.stp] = fragT[T]{&ns, append(e.out, &ns.out1)}
+		s.stack[s.stp] = fragT[T]{&ns, append(e.out, &ns.out1), []int{}}
+
+		if len(e.endsRegisters) > 0 {
+			s.stack[s.stp].endsRegisters = e.endsRegisters
+			e.endsRegisters = []int{}
+		}
+
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
@@ -383,8 +338,8 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.stp--
 		e := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e.start}
-		s.patch(e.out, &ns)
-		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out1}}
+		s.patch(e, e.out, &ns)
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out1}, []int{}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
@@ -393,54 +348,37 @@ func (s *nfaFactory[T]) token2nfa(token tokenT) error {
 		s.stp--
 		e := s.stack[s.stp]
 		ns := nfaStateT[T]{c: ntSplit, out: e.start}
-		s.patch(e.out, &ns)
-		s.stack[s.stp] = fragT[T]{e.start, []**nfaStateT[T]{&ns.out1}}
+		s.patch(e, e.out, &ns)
+		s.stack[s.stp] = fragT[T]{e.start, []**nfaStateT[T]{&ns.out1}, []int{}}
 		s.stp++
 		// No need to call ensure_stack_space here; we popped 1
 		// and added 1
 
 	case tAny:
 		ns := nfaStateT[T]{c: ntMeta, meta: mtAny, out: nil, out1: nil}
-		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
 		s.stp++
 		s.ensure_stack_space()
 
-	case tStartRegister:
-		if s.stp > 0 {
-			ns := s.stack[s.stp-1].start
-			ns.startsRegisters = append(ns.startsRegisters, token.int1)
-		} else {
-			// Parens at the start of the string.
-			// Will need to deal with this later
-			s.startRegisters = append(s.startRegisters, token.int1)
-		}
+	case tEndRegister:
+		// An EndRegister cannot exist on an ntSplit node. It is pushed
+		// down onto the final leavs of the ntSplit node/tree (ending up
+		// on the er slices)
+		dlog.Printf("tEndRegister reg#%d", token.int1)
+
+		ns := s.stack[s.stp-1].start
+		ns.startsRegisters = append(ns.startsRegisters, token.int1)
+		s.stack[s.stp-1].endsRegisters = append(s.stack[s.stp-1].endsRegisters, token.int1)
+
 		if token.int1 > s.numRegisters {
 			s.numRegisters = token.int1
 		}
 
-	case tEndRegister:
-		dlog.Printf("stack:\n%s\n", s.stackRepr())
-		ns := s.stack[s.stp-1].start
-		if ns.out != nil && ns.out1 == nil {
-			dlog.Printf("choosing %s 's out -> %s", ns.Repr0(), ns.out.Repr0())
-			ns = ns.out
-		}
-		dlog.Printf("Adding EndRegister %d to ns #%d %s", token.int1,
-			s.stp, ns.Repr0())
-		/*
-			if ns.c == ntSplit {
-				ns.out.endsRegisters = append(ns.out.endsRegisters, token.int1)
-				ns.out1.endsRegisters = append(ns.out1.endsRegisters, token.int1)
-			} else {
-				ns.endsRegisters = append(ns.endsRegisters, token.int1)
-			}
-		*/
-		ns.endsRegisters = append(ns.endsRegisters, token.int1)
-
 	default:
-		e := fmt.Sprintf("token2nfa: %s not yet handled\n", string(token.ttype))
+		e := fmt.Sprintf("%s not handled\n", string(token.ttype))
 		panic(e)
 	}
+	dlog.Printf("now the stack is:\n%s", s.stackRepr())
 	return nil
 }
 
@@ -451,17 +389,15 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 		return nil, fmt.Errorf("Parsing objregexp: %w", err)
 	}
 
-	for _, token := range tokens {
-		dlog.Printf("token: %+v", token)
-	}
+	printTokens(tokens)
 
 	// stp is where a new item will be placed in the stack.
 	// nfastack must always have allocated space for an item at index 'stp'
 	s.stp = 0
 	s.stack = make([]fragT[T], 1)
 
-	for _, token := range tokens {
-		err = s.token2nfa(token)
+	for i, token := range tokens {
+		err = s.token2nfa(i, token)
 		if err != nil {
 			return nil, err
 		}
@@ -475,21 +411,12 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 			e.Repr()))
 	}
 	re := &Regexp[T]{
-		numRegisters:   s.numRegisters,
-		startRegisters: make([]int, len(s.startRegisters)),
+		numRegisters: s.numRegisters,
 	}
 	re.matchstate.c = ntMatch
-	if len(s.startRegisters) > 0 {
-		copy(re.startRegisters, s.startRegisters)
-	}
 
-	s.patch(e.out, &re.matchstate)
+	s.patch(e, e.out, &re.matchstate)
 	re.nfa = e.start
-
-	// The "EndRegister" info might be placed on ntSplit nodes;
-	// if so, move those down.
-	saw := make(map[*nfaStateT[T]]bool)
-	re.nfa.fixRegistersRecursive(saw)
 
 	// Dump it.
 	dlog.Printf("nfa:\n%s", re.nfa.Repr())
