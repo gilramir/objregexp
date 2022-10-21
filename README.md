@@ -1,22 +1,23 @@
 # Introduction
 
-Regular expressions are convenient mechanisms for doing some types of parsing
-of strings. But what if you aren't analyzing string?
+Regular expressions are convenient mechanisms for parsing
+strings. But what if you aren't analyzing strings?
 "Object" regular expressions are a way to use regular
-expressions on slices of arbitrary objects, instead of just strings.
+expressions on slices of arbitrary objects instead of strings.
 
 This library uses Go generics.  The objects involved in the regular
 must satisfy the "comparable" constraint.
 
 To use this module, you have to define the "vocabulary" of the regular
 expression compiler. You create "object classes" (similar "character classes").
-On type of class is a function, which delcares if an object belongs to the
-class. Another type of class is an identity; a name is given to an object,
+One type of class is implemented by a function which declares if an object
+belongs to the class.
+Another type of class is an identity; a name is given to an object,
 and if the input object compares to it equally, then it is a member of the
 class.
 
-Given the classes, you can write regular expressions using basic
-regular expression syntax.
+Once you define the classes, you can write regular expressions using syntax
+similar to basic regular expression syntax.
 
 See the [module documentation](https://pkg.go.dev/github.com/gilramir/objregexp)
 
@@ -31,12 +32,19 @@ In this syntax:
         in it, except for ":". The name is not limited to ASCII or Latin
         code points.
 
-* A "!" between the "[" and ":" before a class name negates the test.
-        The test looks for non-membership in the class.
+* Inside the "[" and "]" brackets:
+    * A "!" before the ":" of a class name
+        negates the test.  It looks for non-membership in the class.
+    * A "&&" between 2 class names tests that the object belongs
+        to both classes. (TODO)
+    * A "||" between 2 class names tests that the object belongs
+        to either class. (TODO)
+    * "(" and ")" can be used to group the "&" and "|" tests. (TODO)
 
 * A "." matches any one object.
 
-* Parens can be used for grouping.
+* Parens can be used for grouping, both for the globs and for retrieving
+  the range of objects after the match is successful.
 
 * Alternate choices are given via the vertical pipe: |
 
@@ -67,6 +75,10 @@ object classes;
 
     # Match an object which is not part of the "vowel" class.
     [!:vowel:]
+
+    # Match an object which is part of the "vowel" class, and alos
+    # part of the lower-case class.
+    [:vowel: && :lower-case:] (TODO)
 
     # Match either a "vowel" object, or a "consonant" object
     # followed by a "vowel" object.
@@ -193,7 +205,7 @@ For example:
         }
 ---
 
-# Notes
+# Concurrency
 
 The regexes on this module are concurrent-safe. The same Regexp
 object can be used to Match() (with any of the related methods)
