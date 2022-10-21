@@ -37,9 +37,6 @@ type exStateT[T comparable] struct {
 	// for the nfa
 	lastlist int
 
-	// We keep a singly-linked-list backwards from tail to root
-	prev *exStateT[T]
-
 	out, out1 *exStateT[T]
 }
 
@@ -146,7 +143,13 @@ func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool
 				xns.registers.ranges[i].Start = -1
 			} else if reg.Start == -1 {
 				xns.registers.ranges[i].End = -1
+			} else if reg.Start == reg.End {
+				// If they start and stop on the same object,
+				// the range doesn't exist
+				xns.registers.ranges[i].Start = -1
+				xns.registers.ranges[i].End = -1
 			}
+
 		}
 	}
 	return ok, count, xns
@@ -164,6 +167,7 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 	var clist, nlist []*nfaRegStateT[T]
 	s.listid++
 	// first pos is = -1, in case SPLIT is the 1st nfa node
+	dlog.Printf("calling addstate on root nfa")
 	clist = s.addstate(-1, clist, &nfaRegStateT[T]{xstart, s.newRegisters()})
 
 	// Keep track of matches because we want to be a little greedy
@@ -224,22 +228,29 @@ func (s *executorT[T]) addstate(pos int, l []*nfaRegStateT[T], nsx *nfaRegStateT
 		return l
 	}
 	ns.lastlist = s.listid
-	dlog.Printf("in addstate, ns=%s l list has %d items:", ns.Repr0(), len(l))
+	dlog.Printf("in addstate at pos %d, ns=%s l list has %d items:", pos, ns.Repr0(), len(l))
 	for li, lnx := range l {
 		lx := lnx.root
-		dlog.Printf("l #%d: reg:%v\n%s", li, lnx.registers.ranges, lx.Repr())
+		dlog.Printf("state #%d: reg:%v\n%s", li, lnx.registers.ranges, lx.Repr())
 	}
 	if ns.st.c == ntSplit {
 		for _, rn := range ns.st.startsRegisters {
 			dlog.Printf("addstate setting start reg #%d = pos %d", rn, pos)
-			// The matching character starts this register
+			// The matching character starts this register,
+			// unless it was already seen (due to "*" glob)
+			//			if regs.ranges[rn-1].Start == -1 {
 			regs.ranges[rn-1].Start = pos + 1
+			//			}
 		}
 		for _, rn := range ns.st.endsRegisters {
 			dlog.Printf("addstate setting end reg #%d = pos %d", rn, pos)
 			// The end paren is this pos, but we record pos+1
 			// to be more like Go slices
-			regs.ranges[rn-1].End = pos + 1
+			// check that start was seen first; it won't be
+			// in "*" glob
+			if regs.ranges[rn-1].Start != -1 {
+				regs.ranges[rn-1].End = pos + 1
+			}
 		}
 		l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out, nsx.registers.Copy()})
 		l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out1, nsx.registers.Copy()})
@@ -309,8 +320,11 @@ func (s *executorT[T]) step(pos int, clist []*nfaRegStateT[T], ch T, nlist []*nf
 
 			dlog.Printf("matched : %s", xns.Repr0())
 			for _, rn := range ns.startsRegisters {
-				// The matching character starts this register
-				regs.ranges[rn-1].Start = pos
+				// The matching character starts this register,
+				// unless it was already set (due to "*" glob)
+				if regs.ranges[rn-1].Start == -1 {
+					regs.ranges[rn-1].Start = pos
+				}
 			}
 			for _, rn := range ns.endsRegisters {
 				// The end paren is this pos, but we record pos+1
