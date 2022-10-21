@@ -26,8 +26,9 @@ const (
 
 type tokenT struct {
 	ttype tokenType
-	pos   int
-	//value string
+	// position in the regex string; used for reporting syntax
+	// errors to the user.
+	pos int
 
 	// For tClass, name is the name of the class
 	name string
@@ -35,15 +36,11 @@ type tokenT struct {
 	// negation is only used For tClass
 	negation bool
 
-	// For tEndReg, int1 holds the register number
-	int1 int
-	//int2 int
+	// For tEndReg, holds the register number
+	regNum int
 
-	// start capturing a register from this position onwards
-	startRegisters []int
-	// stop capturing  a register after this position
-	endRegisters []int
-
+	// An error caught during parsing, to cause the
+	// parse to fail, and to be reported to the user.
 	err error
 }
 
@@ -56,8 +53,8 @@ func makeTokensString(tokens []tokenT) string {
 }
 
 func (s *tokenT) Repr() string {
-	return fmt.Sprintf("<tokenT %s name:%s neg:%t pos:%d int1:%d sr:%v er:%v>",
-		s.ttype, s.name, s.negation, s.pos, s.int1, s.startRegisters, s.endRegisters)
+	return fmt.Sprintf("<tokenT %s name:%s neg:%t pos:%d reg#:%d>",
+		s.ttype, s.name, s.negation, s.pos, s.regNum)
 }
 
 func printTokens(tokens []tokenT) {
@@ -258,10 +255,9 @@ func (s *reParserState) parseRParen() {
 
 	// Now emit the tEndRegister
 	s.tokenChan <- tokenT{
-		ttype:        tEndRegister,
-		pos:          s.pos,
-		int1:         s.p[s.j].beforeGroupNum,
-		endRegisters: []int{s.p[s.j].beforeGroupNum},
+		ttype:  tEndRegister,
+		pos:    s.pos,
+		regNum: s.p[s.j].beforeGroupNum,
 	}
 }
 

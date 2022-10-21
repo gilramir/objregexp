@@ -364,14 +364,14 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 		// An EndRegister cannot exist on an ntSplit node. It is pushed
 		// down onto the final leavs of the ntSplit node/tree (ending up
 		// on the er slices)
-		dlog.Printf("tEndRegister reg#%d", token.int1)
+		dlog.Printf("tEndRegister reg#%d", token.regNum)
 
 		ns := s.stack[s.stp-1].start
-		ns.startsRegisters = append(ns.startsRegisters, token.int1)
-		s.stack[s.stp-1].endsRegisters = append(s.stack[s.stp-1].endsRegisters, token.int1)
+		ns.startsRegisters = append(ns.startsRegisters, token.regNum)
+		s.stack[s.stp-1].endsRegisters = append(s.stack[s.stp-1].endsRegisters, token.regNum)
 
-		if token.int1 > s.numRegisters {
-			s.numRegisters = token.int1
+		if token.regNum > s.numRegisters {
+			s.numRegisters = token.regNum
 		}
 
 	default:
