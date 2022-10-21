@@ -100,7 +100,7 @@ func (s Match) HasRegister(n int) bool {
 
 // Get a numbered register from the Match. Every left parenthesis
 // in the regex gets a number, starting with 1.
-func (s *Match) Register(n int) Range {
+func (s Match) Register(n int) Range {
 	if s.Success && n > 0 && n <= len(s.registers) {
 		return s.registers[n-1]
 	} else {
