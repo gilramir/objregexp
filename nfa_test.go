@@ -431,3 +431,162 @@ func (s *MySuite) TestNfa10(c *C) {
 	c.Assert(reg1.Start, Equals, -1)
 	c.Assert(reg1.End, Equals, -1)
 }
+
+func (s *MySuite) TestNfa11(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.AddIdentity("o", 'o')
+	compiler.AddIdentity("e", 'e')
+	compiler.AddIdentity("y", 'y')
+	compiler.AddIdentity("aa", 'A')
+	compiler.Finalize()
+
+	text := "([:o:][:e:])*([:y:]|[:aa:])"
+
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	//	err = re.WriteDot("TestNfa11.dot")
+	//	c.Assert(err, IsNil)
+
+	// 1 oe
+	input := []rune{'o', 'e', 'y'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	reg1 := m.Register(1)
+	c.Assert(reg1.Start, Equals, 0)
+	c.Assert(reg1.End, Equals, 2)
+
+	reg2 := m.Register(2)
+	c.Assert(reg2.Start, Equals, 2)
+	c.Assert(reg2.End, Equals, 3)
+
+	// 2 oe's
+	input = []rune{'o', 'e', 'o', 'e', 'A'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	reg1 = m.Register(1)
+	c.Assert(reg1.Start, Equals, 0)
+	c.Assert(reg1.End, Equals, 4)
+
+	reg2 = m.Register(2)
+	c.Assert(reg2.Start, Equals, 4)
+	c.Assert(reg2.End, Equals, 5)
+
+	// 0 oe's
+	input = []rune{'y'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	reg1 = m.Register(1)
+	c.Assert(reg1.Start, Equals, -1)
+	c.Assert(reg1.End, Equals, -1)
+
+	reg2 = m.Register(2)
+	c.Assert(reg2.Start, Equals, 0)
+	c.Assert(reg2.End, Equals, 1)
+}
+
+func (s *MySuite) TestNfa12(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.AddIdentity("o", 'o')
+	compiler.AddIdentity("e", 'e')
+	compiler.AddIdentity("y", 'y')
+	compiler.AddIdentity("aa", 'A')
+	compiler.Finalize()
+
+	text := "([:o:][:e:])+([:y:]|[:aa:])"
+
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	//	err = re.WriteDot("TestNfa12.dot")
+	//	c.Assert(err, IsNil)
+
+	// 1 oe
+	input := []rune{'o', 'e', 'y'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	reg1 := m.Register(1)
+	c.Assert(reg1.Start, Equals, 0)
+	c.Assert(reg1.End, Equals, 2)
+
+	reg2 := m.Register(2)
+	c.Assert(reg2.Start, Equals, 2)
+	c.Assert(reg2.End, Equals, 3)
+
+	// 2 oe's
+	input = []rune{'o', 'e', 'o', 'e', 'A'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	reg1 = m.Register(1)
+	c.Assert(reg1.Start, Equals, 0)
+	c.Assert(reg1.End, Equals, 4)
+
+	reg2 = m.Register(2)
+	c.Assert(reg2.Start, Equals, 4)
+	c.Assert(reg2.End, Equals, 5)
+
+	// 0 oe's
+	input = []rune{'y'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, false)
+}
+
+func (s *MySuite) TestNfa13(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddIdentity("o", 'o')
+	compiler.AddIdentity("e", 'e')
+	compiler.AddIdentity("y", 'y')
+	compiler.AddIdentity("aa", 'A')
+	compiler.Finalize()
+
+	text := "([:o:][:e:])?([:y:]|[:aa:])"
+
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	//	err = re.WriteDot("TestNfa13.dot")
+	//	c.Assert(err, IsNil)
+
+	// 1 oe
+	input := []rune{'o', 'e', 'y'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	reg1 := m.Register(1)
+	c.Assert(reg1.Start, Equals, 0)
+	c.Assert(reg1.End, Equals, 2)
+
+	reg2 := m.Register(2)
+	c.Assert(reg2.Start, Equals, 2)
+	c.Assert(reg2.End, Equals, 3)
+
+	// 2 oe's
+	input = []rune{'o', 'e', 'o', 'e', 'A'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	// 0 oe's
+	input = []rune{'y'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	reg1 = m.Register(1)
+	c.Assert(reg1.Start, Equals, -1)
+	c.Assert(reg1.End, Equals, -1)
+
+	reg2 = m.Register(2)
+	c.Assert(reg2.Start, Equals, 0)
+	c.Assert(reg2.End, Equals, 1)
+}
