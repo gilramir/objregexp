@@ -13,7 +13,7 @@ func (s *MySuite) TestParser01(c *C) {
 
 	c.Assert(len(tokens), Equals, 1)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 }
 
@@ -50,14 +50,14 @@ func (s *MySuite) TestParser05(c *C) {
 
 	c.Assert(len(tokens), Equals, 4)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[1].name, Equals, "bar")
 
-	c.Check(tokens[2].ttype, Equals, tokenType(tGlobStar))
-	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
+	c.Check(tokens[2].ttype, Equals, tokenTypeT(tGlobStar))
+	c.Check(tokens[3].ttype, Equals, tokenTypeT(tConcat))
 }
 
 func (s *MySuite) TestParser06(c *C) {
@@ -67,10 +67,10 @@ func (s *MySuite) TestParser06(c *C) {
 
 	c.Assert(len(tokens), Equals, 2)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tGlobStar))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tGlobStar))
 }
 
 func (s *MySuite) TestParser07(c *C) {
@@ -80,10 +80,10 @@ func (s *MySuite) TestParser07(c *C) {
 
 	c.Assert(len(tokens), Equals, 2)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tGlobPlus))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tGlobPlus))
 }
 
 func (s *MySuite) TestParser08(c *C) {
@@ -93,10 +93,10 @@ func (s *MySuite) TestParser08(c *C) {
 
 	c.Assert(len(tokens), Equals, 2)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tGlobQuestion))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tGlobQuestion))
 }
 
 func (s *MySuite) TestParser09(c *C) {
@@ -107,18 +107,18 @@ func (s *MySuite) TestParser09(c *C) {
 	printTokens(tokens)
 	c.Assert(len(tokens), Equals, 6)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[1].name, Equals, "alpha")
 
-	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[2].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[2].name, Equals, "bar")
 
-	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
-	c.Check(tokens[4].ttype, Equals, tokenType(tEndRegister))
-	c.Check(tokens[5].ttype, Equals, tokenType(tConcat))
+	c.Check(tokens[3].ttype, Equals, tokenTypeT(tConcat))
+	c.Check(tokens[4].ttype, Equals, tokenTypeT(tEndRegister))
+	c.Check(tokens[5].ttype, Equals, tokenTypeT(tConcat))
 }
 
 func (s *MySuite) TestParser10(c *C) {
@@ -128,13 +128,13 @@ func (s *MySuite) TestParser10(c *C) {
 
 	c.Assert(len(tokens), Equals, 3)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[1].name, Equals, "bar")
 
-	c.Check(tokens[2].ttype, Equals, tokenType(tAlternate))
+	c.Check(tokens[2].ttype, Equals, tokenTypeT(tAlternate))
 }
 
 func (s *MySuite) TestParser11(c *C) {
@@ -144,17 +144,17 @@ func (s *MySuite) TestParser11(c *C) {
 
 	c.Assert(len(tokens), Equals, 5)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[1].name, Equals, "bar")
 
-	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[2].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[2].name, Equals, "bar")
 
-	c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
-	c.Check(tokens[4].ttype, Equals, tokenType(tAlternate))
+	c.Check(tokens[3].ttype, Equals, tokenTypeT(tConcat))
+	c.Check(tokens[4].ttype, Equals, tokenTypeT(tAlternate))
 }
 
 func (s *MySuite) TestParser12(c *C) {
@@ -164,17 +164,17 @@ func (s *MySuite) TestParser12(c *C) {
 
 	c.Assert(len(tokens), Equals, 5)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[1].name, Equals, "bar")
 
-	c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[2].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[2].name, Equals, "baz")
 
-	c.Check(tokens[3].ttype, Equals, tokenType(tAlternate))
-	c.Check(tokens[4].ttype, Equals, tokenType(tAlternate))
+	c.Check(tokens[3].ttype, Equals, tokenTypeT(tAlternate))
+	c.Check(tokens[4].ttype, Equals, tokenTypeT(tAlternate))
 }
 
 func (s *MySuite) TestParser13(c *C) {
@@ -184,15 +184,15 @@ func (s *MySuite) TestParser13(c *C) {
 
 	c.Assert(len(tokens), Equals, 4)
 
-	c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[0].name, Equals, "foo")
 
-	c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+	c.Check(tokens[1].ttype, Equals, tokenTypeT(tClass))
 	c.Check(tokens[1].name, Equals, "bar")
 
-	c.Check(tokens[2].ttype, Equals, tokenType(tAlternate))
+	c.Check(tokens[2].ttype, Equals, tokenTypeT(tAlternate))
 
-	c.Check(tokens[3].ttype, Equals, tokenType(tEndRegister))
+	c.Check(tokens[3].ttype, Equals, tokenTypeT(tEndRegister))
 }
 
 // Nested parens
@@ -207,17 +207,17 @@ func (s *MySuite) TestParser14(c *C) {
 	/*
 		c.Assert(len(tokens), Equals, 5)
 
-		c.Check(tokens[0].ttype, Equals, tokenType(tClass))
+		c.Check(tokens[0].ttype, Equals, tokenTypeT(tClass))
 		c.Check(tokens[0].name, Equals, "foo")
 
-		c.Check(tokens[1].ttype, Equals, tokenType(tClass))
+		c.Check(tokens[1].ttype, Equals, tokenTypeT(tClass))
 		c.Check(tokens[1].name, Equals, "alpha")
 
-		c.Check(tokens[2].ttype, Equals, tokenType(tClass))
+		c.Check(tokens[2].ttype, Equals, tokenTypeT(tClass))
 		c.Check(tokens[2].name, Equals, "bar")
 
-		c.Check(tokens[3].ttype, Equals, tokenType(tConcat))
-		c.Check(tokens[4].ttype, Equals, tokenType(tConcat))
+		c.Check(tokens[3].ttype, Equals, tokenTypeT(tConcat))
+		c.Check(tokens[4].ttype, Equals, tokenTypeT(tConcat))
 	*/
 }
 

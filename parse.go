@@ -6,26 +6,25 @@ import (
 	"fmt"
 	"sync"
 	"unicode"
-	"unicode/utf8"
 )
 
-type tokenType string
+type tokenTypeT string
 
 // The token types
 const (
-	tError        tokenType = "E"
-	tClass                  = "C" // [:alpha:]
-	tConcat                 = "." // concatenate, for internal postfix notation
-	tAlternate              = "|" // alternate choices
-	tGlobStar               = "*" // *
-	tGlobPlus               = "+" // +
-	tGlobQuestion           = "?" // ?
-	tAny                    = "A" // .
-	tEndRegister            = ")" // Record info about the close paren
+	tError        tokenTypeT = "E"
+	tClass                   = "C" // [:alpha:]
+	tConcat                  = "." // concatenate, for internal postfix notation
+	tAlternate               = "|" // alternate choices
+	tGlobStar                = "*" // *
+	tGlobPlus                = "+" // +
+	tGlobQuestion            = "?" // ?
+	tAny                     = "A" // .
+	tEndRegister             = ")" // Record info about the close paren
 )
 
 type tokenT struct {
-	ttype tokenType
+	ttype tokenTypeT
 	// position in the regex string; used for reporting syntax
 	// errors to the user.
 	pos int
@@ -63,15 +62,13 @@ func printTokens(tokens []tokenT) {
 	}
 }
 
-func parseRegex(restring string) ([]tokenT, error) {
-	var pstate reParserState
-	pstate.Initialize()
-	pstate.input = restring
+func parseRegex(input string) ([]tokenT, error) {
+	var pstate reParserStateT
+	pstate.Initialize(input)
 
 	tokens := make([]tokenT, 0)
 	go pstate.goparse()
 
-	//	nonStarts := 0
 	for token := range pstate.tokenChan {
 		switch token.ttype {
 		case tError:
@@ -94,9 +91,8 @@ func parseRegex(restring string) ([]tokenT, error) {
 	return tokens, nil
 }
 
-type reParserState struct {
-	input     string
-	pos       int
+type reParserStateT struct {
+	input     runeBufferT
 	tokenChan chan tokenT
 	wg        sync.WaitGroup
 
@@ -125,27 +121,29 @@ type backc struct {
 	beforeGroupNum int
 }
 
-func (s *reParserState) Initialize() {
+func (s *reParserStateT) Initialize(input string) {
+	s.input.Initialize(input)
+	s.input.runeErrorCb = s.emitRuneError
 	s.tokenChan = make(chan tokenT)
 	s.p = make([]backc, 0)
 	s.ensure_stack_space()
 }
 
-func (s *reParserState) ensure_stack_space() {
+func (s *reParserStateT) ensure_stack_space() {
 	if len(s.p) <= s.j+1 {
 		extra := s.j - len(s.p) + 1
 		s.p = append(s.p, make([]backc, extra)...)
 	}
 }
 
-func (s *reParserState) goparse() {
+func (s *reParserStateT) goparse() {
 	s.wg.Add(1)
 	defer s.wg.Done()
 	defer close(s.tokenChan)
 
 	for {
 		// Get the next rune
-		ok, r, eof := s.getNextRune()
+		ok, r, eof := s.input.getNextRune()
 		if !ok {
 			return
 		}
@@ -176,7 +174,7 @@ func (s *reParserState) goparse() {
 			s.parseAny()
 
 		default:
-			s.emitErrorf("Syntax error at pos %d starting with '%c'", s.pos, r)
+			s.emitErrorf("Syntax error at pos %d starting with '%c'", s.input.pos, r)
 			return
 		}
 
@@ -200,7 +198,7 @@ func (s *reParserState) goparse() {
 	}
 }
 
-func (s *reParserState) parseLParen() {
+func (s *reParserStateT) parseLParen() {
 
 	s.groupNumsAllocated++
 
@@ -221,9 +219,9 @@ func (s *reParserState) parseLParen() {
 
 }
 
-func (s *reParserState) parsePipe() {
+func (s *reParserStateT) parsePipe() {
 	if s.natom == 0 {
-		s.emitErrorf("'|' at pos %d is not allowed", s.pos)
+		s.emitErrorf("'|' at pos %d is not allowed", s.input.pos)
 		return
 	}
 	for s.natom--; s.natom > 0; s.natom-- {
@@ -232,10 +230,10 @@ func (s *reParserState) parsePipe() {
 	s.nbin++
 }
 
-func (s *reParserState) parseRParen() {
+func (s *reParserStateT) parseRParen() {
 	// First emit the regular RParen stuff
 	if s.j == 0 || s.natom == 0 {
-		s.emitErrorf("Close paren ')' at pos %d doesn't follow an opening paren.", s.pos)
+		s.emitErrorf("Close paren ')' at pos %d doesn't follow an opening paren.", s.input.pos)
 		return
 	}
 
@@ -256,15 +254,15 @@ func (s *reParserState) parseRParen() {
 	// Now emit the tEndRegister
 	s.tokenChan <- tokenT{
 		ttype:  tEndRegister,
-		pos:    s.pos,
+		pos:    s.input.pos,
 		regNum: s.p[s.j].beforeGroupNum,
 	}
 }
 
-func (s *reParserState) parseGlob(r rune) {
+func (s *reParserStateT) parseGlob(r rune) {
 	if s.natom == 0 {
 		s.emitErrorf("Cannot have glob '%c' at pos %d with no preceding item",
-			r, s.pos)
+			r, s.input.pos)
 		return
 	}
 
@@ -272,37 +270,37 @@ func (s *reParserState) parseGlob(r rune) {
 	case '*':
 		s.tokenChan <- tokenT{
 			ttype: tGlobStar,
-			pos:   s.pos,
+			pos:   s.input.pos,
 		}
 	case '+':
 		s.tokenChan <- tokenT{
 			ttype: tGlobPlus,
-			pos:   s.pos,
+			pos:   s.input.pos,
 		}
 	case '?':
 		s.tokenChan <- tokenT{
 			ttype: tGlobQuestion,
-			pos:   s.pos,
+			pos:   s.input.pos,
 		}
 	default:
-		panic(fmt.Sprintf("Unexpected '%c' at pos %d", r, s.pos))
+		panic(fmt.Sprintf("Unexpected '%c' at pos %d", r, s.input.pos))
 	}
 }
 
-func (s *reParserState) parseAny() {
+func (s *reParserStateT) parseAny() {
 	if s.natom > 1 {
 		s.natom--
 		s.emitConcatenation()
 	}
 	s.tokenChan <- tokenT{
 		ttype: tAny,
-		pos:   s.pos,
+		pos:   s.input.pos,
 	}
 	s.natom++
 }
 
-func (s *reParserState) parseLBracket() {
-	ok, r, eof := s.getNextRune()
+func (s *reParserStateT) parseLBracket() {
+	ok, r, eof := s.input.getNextRune()
 	if eof {
 		s.emitUnexpectedEOF()
 		return
@@ -315,7 +313,7 @@ func (s *reParserState) parseLBracket() {
 	// We can start with a negation
 	if r == '!' {
 		negation = true
-		ok, r, eof = s.getNextRune()
+		ok, r, eof = s.input.getNextRune()
 		if eof {
 			s.emitUnexpectedEOF()
 			return
@@ -327,16 +325,16 @@ func (s *reParserState) parseLBracket() {
 
 	// This must be a ':'
 	if r != ':' {
-		s.emitErrorf("Expected ':' to start a class name at pos %d", s.pos)
+		s.emitErrorf("Expected ':' to start a class name at pos %d", s.input.pos)
 		return
 	}
 
 	// Read rune names until the ending colon
 	nameRunes := make([]rune, 0, 20)
 
-	classPos := s.pos
+	classPos := s.input.pos
 	for {
-		ok, r, eof := s.getNextRune()
+		ok, r, eof := s.input.getNextRune()
 		if eof {
 			s.emitUnexpectedEOF()
 			return
@@ -360,7 +358,7 @@ func (s *reParserState) parseLBracket() {
 	}
 
 	// We need a final ']'
-	ok, r, eof = s.getNextRune()
+	ok, r, eof = s.input.getNextRune()
 	if eof {
 		s.emitUnexpectedEOF()
 		return
@@ -370,7 +368,7 @@ func (s *reParserState) parseLBracket() {
 	}
 
 	if r != ']' {
-		s.emitErrorf("Expected ] to end a class name at pos %d", s.pos)
+		s.emitErrorf("Expected ] to end a class name at pos %d", s.input.pos)
 		return
 	}
 
@@ -388,76 +386,31 @@ func (s *reParserState) parseLBracket() {
 	s.natom++
 }
 
-func (s *reParserState) emitConcatenation() {
+func (s *reParserStateT) emitConcatenation() {
 	// Add a concatention
 	s.tokenChan <- tokenT{
 		ttype: tConcat,
 		pos:   -1,
 	}
 }
-func (s *reParserState) emitAlternation() {
+func (s *reParserStateT) emitAlternation() {
 	s.tokenChan <- tokenT{
 		ttype: tAlternate,
 	}
 }
 
-func (s *reParserState) emitErrorf(f string, args ...any) {
+func (s *reParserStateT) emitErrorf(f string, args ...any) {
 	s.tokenChan <- tokenT{
 		ttype: tError,
-		pos:   s.pos,
+		pos:   s.input.pos,
 		err:   fmt.Errorf(f, args...),
 	}
 	s.emittedError = true
 }
 
-func (s *reParserState) emitRuneError() {
-	s.emitErrorf("Bytes starting at position %d aren't valid UTF-8", s.pos)
+func (s *reParserStateT) emitRuneError() {
+	s.emitErrorf("Bytes starting at position %d aren't valid UTF-8", s.input.pos)
 }
-func (s *reParserState) emitUnexpectedEOF() {
+func (s *reParserStateT) emitUnexpectedEOF() {
 	s.emitErrorf("Unexpected end of string")
-}
-
-// Return ok, rune, eof, and advances the pointer
-// If not ok, this function calls emitRuneError, via _peekNextRune
-func (s *reParserState) getNextRune() (bool, rune, bool) {
-	ok, r, size, eof := s._peekNextRune()
-	if !ok {
-		return false, 0, false
-	}
-
-	if ok && !eof {
-		s.pos += size
-	}
-	return ok, r, eof
-}
-
-// Return ok, rune, eof, but does not advance the pointer
-func (s *reParserState) peekNextRune() (bool, rune, bool) {
-	ok, r, _, eof := s._peekNextRune()
-	return ok, r, eof
-}
-
-// Advances the pointer by 1 rune
-// If not ok, this function calls emitRuneError, via _peekNextRune
-func (s *reParserState) consumeNextRune() (bool, bool) {
-	ok, _, size, eof := s._peekNextRune()
-	if ok && !eof {
-		s.pos += size
-	}
-	return ok, eof
-}
-
-// Internal helper for get/peek/consume- NextRune()
-// If not ok, this function calls emitRuneErro
-func (s *reParserState) _peekNextRune() (bool, rune, int, bool) {
-	// EOS?
-	if s.pos == len(s.input) {
-		return true, utf8.RuneError, 0, true
-	}
-	r, size := utf8.DecodeRuneInString(s.input[s.pos:])
-	if r == utf8.RuneError {
-		s.emitRuneError()
-		return false, utf8.RuneError, size, false
-	}
-	return true, r, size, false
 }
