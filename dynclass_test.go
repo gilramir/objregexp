@@ -169,3 +169,20 @@ func (s *MySuite) TestDynParse07(c *C) {
 	c.Check(tokens[10].ttype, Equals, dcTokenTypeT("?"))
 	c.Check(tokens[10].jmpTarget, Equals, 1)
 }
+
+func (s *MySuite) TestDynCompile01(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddIdentity("a", 'a')
+	compiler.Finalize()
+
+	text := ":a: && :consonant:"
+	dynClass, err := newDynClassT[rune](text, 0, &compiler)
+	c.Assert(err, IsNil)
+
+	for i, op := range dynClass.ops {
+		dlog.Printf("op #%d: %+v", i, op)
+	}
+}

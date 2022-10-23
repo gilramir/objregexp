@@ -12,17 +12,19 @@ import (
 )
 
 type dynClassT[T comparable] struct {
-	ops []dynClassOpT[T]
+	ops       []dynClassOpT[T]
+	posOffset int
 }
 
 type dcopTypeT string
 
 const (
-	dcClass         dcopTypeT = "C"
-	dcIdentity                = "I"
-	dcNegate                  = "!"
-	dcSuccessIfTrue           = "?"
-	dcFailIfFalse             = "x"
+	dcClass       dcopTypeT = "C"
+	dcIdentity              = "I"
+	dcNot                   = "!"
+	dcAssertTrue            = "?"
+	dcJumpIfTrue            = "T"
+	dcJumpIfFalse           = "F"
 )
 
 type dynClassOpT[T comparable] struct {
@@ -35,31 +37,121 @@ type dynClassOpT[T comparable] struct {
 	iObj T
 
 	// cName is set if opType is dcClass or dcIdentity
+	// TODO - do I need this?
 	cName string
+
+	// If this is a jump, which instruction to jump to
+	jmpTo int
 }
 
-func newDynClassT[T comparable](text string) (*dynClassT[T], error) {
+func newDynClassT[T comparable](text string, posOffset int, compiler *Compiler[T]) (*dynClassT[T], error) {
 	s := &dynClassT[T]{
 		ops: make([]dynClassOpT[T], 0),
 	}
-	err := s.parse(text)
+	err := s.parse(text, compiler)
 	if err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-func (s *dynClassT[T]) parse(text string) error {
+type jmpInfoT struct {
+	insnPos   int
+	jmpTarget int
+}
+
+func (s *dynClassT[T]) parse(text string, compiler *Compiler[T]) error {
 
 	// Produce a slice of postfix-ordered tokens
 	tokens, err := s.tokenize(text)
 	if err != nil {
 		return err
 	}
-	dlog.Printf("tokens: %+v\n", tokens)
+	for ti, tok := range tokens {
+		dlog.Printf("token #%d: %+v\n", ti, tok)
+	}
 
 	// convert to opcodes
+	ops := make([]dynClassOpT[T], 0, len(tokens))
 
+	jmpInfos := make([]jmpInfoT, 0)
+
+	// Key = target, Value = pos
+	jmpAt := make(map[int]int)
+
+	for ti, tok := range tokens {
+		op := dynClassOpT[T]{}
+
+		switch tok.ttype {
+		case dctClass:
+
+			/*
+				if tok.name[0] != ':' {
+					panic(fmt.Sprintf("Token %s doesn't begin with :", tok.name))
+				}
+				if tok.name[len(tok.name)-1] != ':' {
+					panic(fmt.Sprintf("Token %s doesn't end with :", tok.name))
+				}
+				// We konw that each ":" is only 1 byte long
+				name := tok.name[1 : len(tok.name)-2]
+			*/
+			name := tok.name
+
+			ctype, has := compiler.namespace[name]
+			if !has {
+				return fmt.Errorf("Class :%s: at pos %d is unknown",
+					name, tok.pos+s.posOffset)
+			}
+			switch ctype {
+			case ccClass:
+				op.opType = dcClass
+				op.oClass = compiler.classMap[tok.name]
+			case ccIdentity:
+				op.opType = dcIdentity
+				op.iObj = compiler.identityObj[tok.name]
+			default:
+				panic(fmt.Sprintf("Unexpected class type %v for %s", tok.ttype, name))
+			}
+			op.cName = name
+
+		case dctNot:
+			op.opType = dcNot
+
+		case dctAssertTrue:
+			op.opType = dcAssertTrue
+			if tok.jmpTarget > 0 {
+				jmpAt[tok.jmpTarget] = ti
+			}
+
+		case dctJumpIfFalse:
+			op.opType = dcJumpIfFalse
+			if tok.jmpTarget > 0 {
+				jmpInfos = append(jmpInfos, jmpInfoT{insnPos: ti, jmpTarget: tok.jmpTarget})
+			}
+
+		case dctJumpIfTrue:
+			op.opType = dcJumpIfTrue
+			if tok.jmpTarget > 0 {
+				jmpInfos = append(jmpInfos, jmpInfoT{insnPos: ti, jmpTarget: tok.jmpTarget})
+			}
+
+		default:
+			panic(fmt.Sprintf("Unexpected token type %v", tok.ttype))
+		}
+		ops = append(ops, op)
+	}
+
+	// Fix up the jumps
+	for _, ji := range jmpInfos {
+
+		jmpToPos := jmpAt[ji.jmpTarget]
+		if jmpToPos == 0 {
+			panic(fmt.Sprintf("jmp at pos %d to target %d not found", ji.insnPos, ji.jmpTarget))
+		}
+		ops[ji.insnPos].jmpTo = jmpToPos
+	}
+
+	s.ops = ops
 	return nil
 }
 
@@ -103,7 +195,7 @@ type dcTokenT struct {
 	name string
 
 	// where to jump to for JumpIfFalse and JumpIfTrue
-	// if on an operand, and jmpTarget is set, the next insns
+	// if on an Assert operand, and jmpTarget is set, the next insns
 	// is the target
 	jmpTarget int
 

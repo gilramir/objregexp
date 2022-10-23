@@ -62,3 +62,7 @@ func (s *runeBufferT) _peekNextRune() (bool, rune, int, bool) {
 	}
 	return true, r, size, false
 }
+
+func (s *runeBufferT) getStringSlice(start int, end int) string {
+	return string(s.input[start:end])
+}

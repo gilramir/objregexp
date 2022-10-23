@@ -56,6 +56,7 @@ type nodeType int
 const (
 	ntClass nodeType = iota
 	ntIdentity
+	ntDynClass
 	ntMeta
 	ntMatch
 	ntSplit
@@ -79,7 +80,10 @@ type nfaStateT[T comparable] struct {
 	// iObj is set if c is ntIdentity
 	iObj T
 
-	// cName is set if c is ntClass or ntIdentity
+	// if c is ntDynClass
+	dynClass *dynClassT[T]
+
+	// cName is set if c is ntClass or ntIdentity or ntDynClass
 	cName string
 
 	// negation is valid for either oClass or iObj
@@ -123,6 +127,9 @@ func (s *nfaStateT[T]) Repr0() string {
 			label = "MT?"
 		}
 
+	case ntDynClass:
+		label = s.cName
+
 	case ntClass:
 		if s.negation {
 			label = "!" + s.oClass.Name
@@ -154,6 +161,8 @@ func (s *nfaStateT[T]) Repr0Dot() string {
 			label = "MT?"
 		}
 
+	case ntDynClass:
+		label = s.cName
 	case ntClass:
 		if s.negation {
 			label = "!" + s.oClass.Name
@@ -263,7 +272,7 @@ func (s *nfaFactory[T]) ensure_stack_space() {
 	}
 }
 
-func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
+func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT[T]) error {
 
 	dlog.Printf("---------------------")
 	dlog.Printf("token2nfa: #%d %s", tnum, token.Repr())
@@ -292,6 +301,13 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 			ns = nfaStateT[T]{c: ntIdentity, iObj: obj, cName: token.name, negation: token.negation,
 				out: nil, out1: nil}
 		}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
+		s.stp++
+		s.ensure_stack_space()
+
+	case tDynClass:
+		ns := nfaStateT[T]{c: ntDynClass, dynClass: token.dynClass, cName: token.name,
+			out: nil, out1: nil}
 		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
 		s.stp++
 		s.ensure_stack_space()
@@ -384,7 +400,7 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 
 func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 
-	tokens, err := parseRegex(text)
+	tokens, err := parseRegex[T](text, s.compiler)
 	if err != nil {
 		return nil, fmt.Errorf("Parsing objregexp: %w", err)
 	}

@@ -14,6 +14,7 @@ type tokenTypeT string
 const (
 	tError        tokenTypeT = "E"
 	tClass                   = "C" // [:alpha:]
+	tDynClass                = "D" // [:alpha:]
 	tConcat                  = "." // concatenate, for internal postfix notation
 	tAlternate               = "|" // alternate choices
 	tGlobStar                = "*" // *
@@ -23,7 +24,7 @@ const (
 	tEndRegister             = ")" // Record info about the close paren
 )
 
-type tokenT struct {
+type tokenT[T comparable] struct {
 	ttype tokenTypeT
 	// position in the regex string; used for reporting syntax
 	// errors to the user.
@@ -41,9 +42,11 @@ type tokenT struct {
 	// An error caught during parsing, to cause the
 	// parse to fail, and to be reported to the user.
 	err error
+
+	dynClass *dynClassT[T]
 }
 
-func makeTokensString(tokens []tokenT) string {
+func makeTokensString[T comparable](tokens []tokenT[T]) string {
 	text := ""
 	for _, t := range tokens {
 		text += string(t.ttype)
@@ -51,22 +54,22 @@ func makeTokensString(tokens []tokenT) string {
 	return text
 }
 
-func (s *tokenT) Repr() string {
-	return fmt.Sprintf("<tokenT %s name:%s neg:%t pos:%d reg#:%d>",
+func (s *tokenT[T]) Repr() string {
+	return fmt.Sprintf("<tokenT[T] %s name:%s neg:%t pos:%d reg#:%d>",
 		s.ttype, s.name, s.negation, s.pos, s.regNum)
 }
 
-func printTokens(tokens []tokenT) {
+func printTokens[T comparable](tokens []tokenT[T]) {
 	for i, t := range tokens {
 		dlog.Printf("#%d. %s", i, t.Repr())
 	}
 }
 
-func parseRegex(input string) ([]tokenT, error) {
-	var pstate reParserStateT
-	pstate.Initialize(input)
+func parseRegex[T comparable](input string, compiler *Compiler[T]) ([]tokenT[T], error) {
+	var pstate reParserStateT[T]
+	pstate.Initialize(input, compiler)
 
-	tokens := make([]tokenT, 0)
+	tokens := make([]tokenT[T], 0)
 	go pstate.goparse()
 
 	for token := range pstate.tokenChan {
@@ -91,9 +94,9 @@ func parseRegex(input string) ([]tokenT, error) {
 	return tokens, nil
 }
 
-type reParserStateT struct {
+type reParserStateT[T comparable] struct {
 	input     runeBufferT
-	tokenChan chan tokenT
+	tokenChan chan tokenT[T]
 	wg        sync.WaitGroup
 
 	groupNumsAllocated int
@@ -113,6 +116,8 @@ type reParserStateT struct {
 
 	// The pos in p where the next stack entry can be placed.
 	j int
+
+	compiler *Compiler[T]
 }
 
 type backc struct {
@@ -121,22 +126,23 @@ type backc struct {
 	beforeGroupNum int
 }
 
-func (s *reParserStateT) Initialize(input string) {
+func (s *reParserStateT[T]) Initialize(input string, compiler *Compiler[T]) {
 	s.input.Initialize(input)
 	s.input.runeErrorCb = s.emitRuneError
-	s.tokenChan = make(chan tokenT)
+	s.tokenChan = make(chan tokenT[T])
 	s.p = make([]backc, 0)
 	s.ensure_stack_space()
+	s.compiler = compiler
 }
 
-func (s *reParserStateT) ensure_stack_space() {
+func (s *reParserStateT[T]) ensure_stack_space() {
 	if len(s.p) <= s.j+1 {
 		extra := s.j - len(s.p) + 1
 		s.p = append(s.p, make([]backc, extra)...)
 	}
 }
 
-func (s *reParserStateT) goparse() {
+func (s *reParserStateT[T]) goparse() {
 	s.wg.Add(1)
 	defer s.wg.Done()
 	defer close(s.tokenChan)
@@ -168,7 +174,7 @@ func (s *reParserStateT) goparse() {
 			s.parseGlob(r)
 
 		case '[':
-			s.parseLBracket()
+			s.parseLBracket2()
 
 		case '.':
 			s.parseAny()
@@ -198,7 +204,7 @@ func (s *reParserStateT) goparse() {
 	}
 }
 
-func (s *reParserStateT) parseLParen() {
+func (s *reParserStateT[T]) parseLParen() {
 
 	s.groupNumsAllocated++
 
@@ -219,7 +225,7 @@ func (s *reParserStateT) parseLParen() {
 
 }
 
-func (s *reParserStateT) parsePipe() {
+func (s *reParserStateT[T]) parsePipe() {
 	if s.natom == 0 {
 		s.emitErrorf("'|' at pos %d is not allowed", s.input.pos)
 		return
@@ -230,7 +236,7 @@ func (s *reParserStateT) parsePipe() {
 	s.nbin++
 }
 
-func (s *reParserStateT) parseRParen() {
+func (s *reParserStateT[T]) parseRParen() {
 	// First emit the regular RParen stuff
 	if s.j == 0 || s.natom == 0 {
 		s.emitErrorf("Close paren ')' at pos %d doesn't follow an opening paren.", s.input.pos)
@@ -252,14 +258,14 @@ func (s *reParserStateT) parseRParen() {
 	s.natom++
 
 	// Now emit the tEndRegister
-	s.tokenChan <- tokenT{
+	s.tokenChan <- tokenT[T]{
 		ttype:  tEndRegister,
 		pos:    s.input.pos,
 		regNum: s.p[s.j].beforeGroupNum,
 	}
 }
 
-func (s *reParserStateT) parseGlob(r rune) {
+func (s *reParserStateT[T]) parseGlob(r rune) {
 	if s.natom == 0 {
 		s.emitErrorf("Cannot have glob '%c' at pos %d with no preceding item",
 			r, s.input.pos)
@@ -268,17 +274,17 @@ func (s *reParserStateT) parseGlob(r rune) {
 
 	switch r {
 	case '*':
-		s.tokenChan <- tokenT{
+		s.tokenChan <- tokenT[T]{
 			ttype: tGlobStar,
 			pos:   s.input.pos,
 		}
 	case '+':
-		s.tokenChan <- tokenT{
+		s.tokenChan <- tokenT[T]{
 			ttype: tGlobPlus,
 			pos:   s.input.pos,
 		}
 	case '?':
-		s.tokenChan <- tokenT{
+		s.tokenChan <- tokenT[T]{
 			ttype: tGlobQuestion,
 			pos:   s.input.pos,
 		}
@@ -287,19 +293,103 @@ func (s *reParserStateT) parseGlob(r rune) {
 	}
 }
 
-func (s *reParserStateT) parseAny() {
+func (s *reParserStateT[T]) parseAny() {
 	if s.natom > 1 {
 		s.natom--
 		s.emitConcatenation()
 	}
-	s.tokenChan <- tokenT{
+	s.tokenChan <- tokenT[T]{
 		ttype: tAny,
 		pos:   s.input.pos,
 	}
 	s.natom++
 }
 
-func (s *reParserStateT) parseLBracket() {
+func (s *reParserStateT[T]) parseLBracket2() {
+	// Look for the RBracket, but take into consideration
+	// that the class name can have a RBracket in it.
+	startPos := s.input.pos
+	endPos := -1
+
+	needColon := false
+	for {
+		// set endPos here; if we get ']' it will be correct.
+		endPos = s.input.pos
+		ok, r, eof := s.input.getNextRune()
+		if eof {
+			s.emitUnexpectedEOF()
+			return
+		}
+		if !ok {
+			return
+		}
+		if needColon {
+			if r == ':' {
+				needColon = false
+				continue
+			}
+		} else {
+			if r == ']' {
+				break
+			}
+		}
+	}
+
+	text := s.input.getStringSlice(startPos, endPos)
+
+	// Do we have just 1 class name, or more?
+	negation := false
+	numColons := 0
+	fcPos := 0
+	scPos := 0
+	for i, c := range text {
+		if numColons == 0 && c == '!' {
+			negation = true
+		}
+		if c == ':' {
+			if numColons == 0 {
+				fcPos = i
+			} else if numColons == 1 {
+				scPos = i
+			}
+			numColons++
+			if numColons == 3 {
+				break
+			}
+		}
+	}
+
+	if s.natom > 1 {
+		s.natom--
+		s.emitConcatenation()
+	}
+
+	if numColons > 2 {
+		dynClass, err := newDynClassT[T](text, startPos, s.compiler)
+		if err != nil {
+			s.emitErrorf("Parsing class string at pos %d: %s",
+				startPos, err)
+			return
+		}
+
+		s.tokenChan <- tokenT[T]{
+			ttype:    tDynClass,
+			pos:      startPos,
+			name:     text,
+			dynClass: dynClass,
+		}
+	} else {
+		s.tokenChan <- tokenT[T]{
+			ttype:    tClass,
+			pos:      startPos,
+			name:     text[fcPos+1 : scPos],
+			negation: negation,
+		}
+	}
+	s.natom++
+}
+
+func (s *reParserStateT[T]) parseLBracket() {
 	ok, r, eof := s.input.getNextRune()
 	if eof {
 		s.emitUnexpectedEOF()
@@ -377,7 +467,7 @@ func (s *reParserStateT) parseLBracket() {
 		s.emitConcatenation()
 	}
 
-	s.tokenChan <- tokenT{
+	s.tokenChan <- tokenT[T]{
 		ttype:    tClass,
 		pos:      classPos,
 		name:     string(nameRunes),
@@ -386,21 +476,21 @@ func (s *reParserStateT) parseLBracket() {
 	s.natom++
 }
 
-func (s *reParserStateT) emitConcatenation() {
+func (s *reParserStateT[T]) emitConcatenation() {
 	// Add a concatention
-	s.tokenChan <- tokenT{
+	s.tokenChan <- tokenT[T]{
 		ttype: tConcat,
 		pos:   -1,
 	}
 }
-func (s *reParserStateT) emitAlternation() {
-	s.tokenChan <- tokenT{
+func (s *reParserStateT[T]) emitAlternation() {
+	s.tokenChan <- tokenT[T]{
 		ttype: tAlternate,
 	}
 }
 
-func (s *reParserStateT) emitErrorf(f string, args ...any) {
-	s.tokenChan <- tokenT{
+func (s *reParserStateT[T]) emitErrorf(f string, args ...any) {
+	s.tokenChan <- tokenT[T]{
 		ttype: tError,
 		pos:   s.input.pos,
 		err:   fmt.Errorf(f, args...),
@@ -408,9 +498,9 @@ func (s *reParserStateT) emitErrorf(f string, args ...any) {
 	s.emittedError = true
 }
 
-func (s *reParserStateT) emitRuneError() {
+func (s *reParserStateT[T]) emitRuneError() {
 	s.emitErrorf("Bytes starting at position %d aren't valid UTF-8", s.input.pos)
 }
-func (s *reParserStateT) emitUnexpectedEOF() {
+func (s *reParserStateT[T]) emitUnexpectedEOF() {
 	s.emitErrorf("Unexpected end of string")
 }
