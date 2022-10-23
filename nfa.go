@@ -272,7 +272,7 @@ func (s *nfaFactory[T]) ensure_stack_space() {
 	}
 }
 
-func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT[T]) error {
+func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 
 	dlog.Printf("---------------------")
 	dlog.Printf("token2nfa: #%d %s", tnum, token.Repr())
@@ -306,7 +306,13 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT[T]) error {
 		s.ensure_stack_space()
 
 	case tDynClass:
-		ns := nfaStateT[T]{c: ntDynClass, dynClass: token.dynClass, cName: token.name,
+		dynClass, err := newDynClassT[T](token.name, s.compiler)
+		if err != nil {
+			return fmt.Errorf("Parsing class string at pos %d: %s",
+				token.pos, err)
+		}
+
+		ns := nfaStateT[T]{c: ntDynClass, dynClass: dynClass, cName: token.name,
 			out: nil, out1: nil}
 		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
 		s.stp++
@@ -400,7 +406,7 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT[T]) error {
 
 func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 
-	tokens, err := parseRegex[T](text, s.compiler)
+	tokens, err := parseRegex(text)
 	if err != nil {
 		return nil, fmt.Errorf("Parsing objregexp: %w", err)
 	}

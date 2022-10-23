@@ -12,8 +12,7 @@ import (
 )
 
 type dynClassT[T comparable] struct {
-	ops       []dynClassOpT[T]
-	posOffset int
+	ops []dynClassOpT[T]
 }
 
 type dcopTypeT string
@@ -44,7 +43,7 @@ type dynClassOpT[T comparable] struct {
 	jmpTo int
 }
 
-func newDynClassT[T comparable](text string, posOffset int, compiler *Compiler[T]) (*dynClassT[T], error) {
+func newDynClassT[T comparable](text string, compiler *Compiler[T]) (*dynClassT[T], error) {
 	s := &dynClassT[T]{
 		ops: make([]dynClassOpT[T], 0),
 	}
@@ -100,7 +99,7 @@ func (s *dynClassT[T]) parse(text string, compiler *Compiler[T]) error {
 			ctype, has := compiler.namespace[name]
 			if !has {
 				return fmt.Errorf("Class :%s: at pos %d is unknown",
-					name, tok.pos+s.posOffset)
+					name, tok.pos)
 			}
 			switch ctype {
 			case ccClass:

@@ -179,7 +179,7 @@ func (s *MySuite) TestDynCompile01(c *C) {
 	compiler.Finalize()
 
 	text := ":a: && :consonant:"
-	dynClass, err := newDynClassT[rune](text, 0, &compiler)
+	dynClass, err := newDynClassT[rune](text, &compiler)
 	c.Assert(err, IsNil)
 
 	for i, op := range dynClass.ops {
