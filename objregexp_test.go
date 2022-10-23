@@ -247,10 +247,38 @@ func (s *MySuite) TestGlob03(c *C) {
 	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
-	// TODO - this needs to change to true + consumed
 	input = []rune{'A', 'A'}
 	m = re_vg.FullMatch(input)
 	c.Check(m.Success, Equals, false)
+}
+
+// Test glob ? grediness
+func (s *MySuite) TestGlob04(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.Finalize()
+
+	re, err := compiler.Compile("[:consonant:][:vowel:]?")
+	c.Assert(err, IsNil)
+
+	input := []rune{'B'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 1)
+
+	input = []rune{}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'B', 'A'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 2)
 }
 
 // Test paren with no glob
