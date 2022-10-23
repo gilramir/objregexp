@@ -170,7 +170,7 @@ func (s *MySuite) TestDynParse07(c *C) {
 	c.Check(tokens[10].jmpTarget, Equals, 1)
 }
 
-func (s *MySuite) TestDynCompile01(c *C) {
+func (s *MySuite) TestDynMatch01(c *C) {
 
 	var compiler Compiler[rune]
 	compiler.Initialize()
@@ -185,4 +185,72 @@ func (s *MySuite) TestDynCompile01(c *C) {
 	for i, op := range dynClass.ops {
 		dlog.Printf("op #%d: %+v", i, op)
 	}
+
+	m := dynClass.Matches('a')
+	c.Check(m, Equals, false)
+
+	m = dynClass.Matches('B')
+	c.Check(m, Equals, false)
+}
+
+func (s *MySuite) TestDynMatch02(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(LowerClass)
+	compiler.AddIdentity("e", 'e')
+	compiler.Finalize()
+
+	text := ":lower: && (:consonant: || :e:)"
+	dynClass, err := newDynClassT[rune](text, &compiler)
+	c.Assert(err, IsNil)
+
+	for i, op := range dynClass.ops {
+		dlog.Printf("op #%d: %+v", i, op)
+	}
+
+	m := dynClass.Matches('a')
+	c.Check(m, Equals, false)
+
+	m = dynClass.Matches('e')
+	c.Check(m, Equals, true)
+
+	m = dynClass.Matches('m')
+	c.Check(m, Equals, true)
+}
+
+func (s *MySuite) TestDynMatch03(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(UpperClass)
+	compiler.AddClass(LowerClass)
+	compiler.Finalize()
+
+	text := ":digit: || ((:consonant: && :lower:) || (:vowel: && :upper:))"
+	dynClass, err := newDynClassT[rune](text, &compiler)
+	c.Assert(err, IsNil)
+
+	for i, op := range dynClass.ops {
+		dlog.Printf("op #%d: %+v", i, op)
+	}
+
+	m := dynClass.Matches('9')
+	c.Check(m, Equals, true)
+
+	m = dynClass.Matches('e')
+	c.Check(m, Equals, false)
+
+	m = dynClass.Matches('E')
+	c.Check(m, Equals, true)
+
+	m = dynClass.Matches('m')
+	c.Check(m, Equals, true)
+
+	m = dynClass.Matches('M')
+	c.Check(m, Equals, false)
 }

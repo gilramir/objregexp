@@ -6,10 +6,42 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-var vowels = []rune{'A', 'E', 'I', 'O', 'U'}
+var vowels = []rune{'A', 'E', 'I', 'O', 'U', 'a', 'e', 'i', 'o', 'u'}
 var consonants = []rune{'B', 'C', 'D', 'F', 'G', 'H', 'J', 'K',
-	'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z'}
+	'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z',
+	'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r',
+	's', 't', 'v', 'w', 'x', 'y', 'z'}
 var digits = []rune{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
+
+var uppers = []rune{'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K',
+	'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'}
+
+var lowers = []rune{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
+	'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'}
+
+var UpperClass = &Class[rune]{
+	"upper",
+	func(r rune) bool {
+		for _, t := range uppers {
+			if r == t {
+				return true
+			}
+		}
+		return false
+	},
+}
+
+var LowerClass = &Class[rune]{
+	"lower",
+	func(r rune) bool {
+		for _, t := range lowers {
+			if r == t {
+				return true
+			}
+		}
+		return false
+	},
+}
 
 var VowelClass = &Class[rune]{
 	"vowel",
@@ -339,4 +371,72 @@ func (s *MySuite) TestIdentity01(c *C) {
 	input = []rune{'9', 'x', '1'}
 	m = re_vowel.FullMatch(input)
 	c.Check(m.Success, Equals, true)
+}
+
+func (s *MySuite) TestDynClass01(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(UpperClass)
+	compiler.AddClass(LowerClass)
+	compiler.Finalize()
+
+	text := "[:digit: || ((:consonant: && :lower:) || (:vowel: && :upper:))]"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'9'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'e'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'E'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'m'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'M'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, false)
+}
+
+func (s *MySuite) TestDynClass02(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(UpperClass)
+	compiler.AddClass(LowerClass)
+	compiler.Finalize()
+
+	text := "[:digit: || ((:consonant: && :lower:) || (:vowel: && :upper:))]+"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'9', 'E', 'm'}
+	m := re.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+
+	input = []rune{'e'}
+	m = re.FullMatch(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'9', 'E', 'M'}
+	m = re.FullMatch(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'9', 'e', 'M'}
+	m = re.FullMatch(input)
+	c.Check(m.Success, Equals, false)
 }

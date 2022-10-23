@@ -5,7 +5,6 @@ package objregexp
 import (
 	"fmt"
 	"sync"
-	"unicode"
 )
 
 type tokenTypeT string
@@ -169,7 +168,7 @@ func (s *reParserStateT) goparse() {
 			s.parseGlob(r)
 
 		case '[':
-			s.parseLBracket2()
+			s.parseLBracket()
 
 		case '.':
 			s.parseAny()
@@ -300,7 +299,7 @@ func (s *reParserStateT) parseAny() {
 	s.natom++
 }
 
-func (s *reParserStateT) parseLBracket2() {
+func (s *reParserStateT) parseLBracket() {
 	// Look for the RBracket, but take into consideration
 	// that the class name can have a RBracket in it.
 	startPos := s.input.pos
@@ -372,93 +371,6 @@ func (s *reParserStateT) parseLBracket2() {
 			name:     text[fcPos+1 : scPos],
 			negation: negation,
 		}
-	}
-	s.natom++
-}
-
-func (s *reParserStateT) parseLBracket() {
-	ok, r, eof := s.input.getNextRune()
-	if eof {
-		s.emitUnexpectedEOF()
-		return
-	}
-	if !ok {
-		return
-	}
-
-	var negation bool
-	// We can start with a negation
-	if r == '!' {
-		negation = true
-		ok, r, eof = s.input.getNextRune()
-		if eof {
-			s.emitUnexpectedEOF()
-			return
-		}
-		if !ok {
-			return
-		}
-	}
-
-	// This must be a ':'
-	if r != ':' {
-		s.emitErrorf("Expected ':' to start a class name at pos %d", s.input.pos)
-		return
-	}
-
-	// Read rune names until the ending colon
-	nameRunes := make([]rune, 0, 20)
-
-	classPos := s.input.pos
-	for {
-		ok, r, eof := s.input.getNextRune()
-		if eof {
-			s.emitUnexpectedEOF()
-			return
-		}
-		if !ok {
-			return
-		}
-
-		// Allow anything except non-visible code point glyphs.
-		// But do allow spaces
-		if !unicode.IsGraphic(r) && r != ' ' {
-			s.emitErrorf("The class name starting at pos %d has a non-graphic Unicode code point in it",
-				classPos)
-			return
-		}
-
-		if r == ':' {
-			break
-		}
-		nameRunes = append(nameRunes, r)
-	}
-
-	// We need a final ']'
-	ok, r, eof = s.input.getNextRune()
-	if eof {
-		s.emitUnexpectedEOF()
-		return
-	}
-	if !ok {
-		return
-	}
-
-	if r != ']' {
-		s.emitErrorf("Expected ] to end a class name at pos %d", s.input.pos)
-		return
-	}
-
-	if s.natom > 1 {
-		s.natom--
-		s.emitConcatenation()
-	}
-
-	s.tokenChan <- tokenT{
-		ttype:    tClass,
-		pos:      classPos,
-		name:     string(nameRunes),
-		negation: negation,
 	}
 	s.natom++
 }

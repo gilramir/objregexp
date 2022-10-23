@@ -21,7 +21,7 @@ const (
 	dcClass       dcopTypeT = "C"
 	dcIdentity              = "I"
 	dcNot                   = "!"
-	dcAssertTrue            = "?"
+	dcNoOp                  = "?"
 	dcJumpIfTrue            = "T"
 	dcJumpIfFalse           = "F"
 )
@@ -116,8 +116,8 @@ func (s *dynClassT[T]) parse(text string, compiler *Compiler[T]) error {
 		case dctNot:
 			op.opType = dcNot
 
-		case dctAssertTrue:
-			op.opType = dcAssertTrue
+		case dctNoOp:
+			op.opType = dcNoOp
 			if tok.jmpTarget > 0 {
 				jmpAt[tok.jmpTarget] = ti
 			}
@@ -154,6 +154,44 @@ func (s *dynClassT[T]) parse(text string, compiler *Compiler[T]) error {
 	return nil
 }
 
+func (s *dynClassT[T]) Matches(ch T) bool {
+
+	accum := true
+
+	for pos := 0; pos < len(s.ops); {
+
+		op := s.ops[pos]
+		switch op.opType {
+		case dcClass:
+			accum = op.oClass.Matches(ch)
+			pos++
+		case dcIdentity:
+			accum = op.iObj == ch
+			pos++
+		case dcNot:
+			accum = !accum
+			pos++
+		case dcJumpIfTrue:
+			if accum {
+				pos = op.jmpTo
+			} else {
+				pos++
+			}
+		case dcJumpIfFalse:
+			if !accum {
+				pos = op.jmpTo
+			} else {
+				pos++
+			}
+		case dcNoOp:
+			pos++
+		default:
+			panic(fmt.Sprintf("Unexpected op #%d: %+v", pos, op))
+		}
+	}
+	return accum
+}
+
 func (s *dynClassT[T]) tokenize(input string) ([]dcTokenT, error) {
 	var pstate dcParserStateT[T]
 	pstate.Initialize(input)
@@ -169,7 +207,7 @@ type dcTokenTypeT string
 const (
 	dctError       dcTokenTypeT = "E"
 	dctClass                    = "C" // :alpha:
-	dctAssertTrue               = "?" // Final check for && and ||
+	dctNoOp                     = "?" // Short-circuit jump target for && and ||
 	dctNot                      = "!"
 	dctLParen                   = "("
 	dctRParen                   = ")"
@@ -194,7 +232,7 @@ type dcTokenT struct {
 	name string
 
 	// where to jump to for JumpIfFalse and JumpIfTrue
-	// if on an Assert operand, and jmpTarget is set, the next insns
+	// if on an NoOp operand, and jmpTarget is set, the next insns
 	// is the target
 	jmpTarget int
 
@@ -394,7 +432,7 @@ func (s *dcParserStateT[T]) parsePipe() {
 	}
 
 	s.stack.Push(dcTokenT{
-		ttype:      dctAssertTrue,
+		ttype:      dctNoOp,
 		pos:        s.input.pos,
 		jmpTarget:  jmpTarget,
 		precedence: orPrecedence,
@@ -435,7 +473,7 @@ func (s *dcParserStateT[T]) parseAmpersand() {
 	}
 
 	s.stack.Push(dcTokenT{
-		ttype:      dctAssertTrue,
+		ttype:      dctNoOp,
 		pos:        s.input.pos,
 		jmpTarget:  jmpTarget,
 		precedence: andPrecedence,

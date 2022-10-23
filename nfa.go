@@ -300,6 +300,8 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 			}
 			ns = nfaStateT[T]{c: ntIdentity, iObj: obj, cName: token.name, negation: token.negation,
 				out: nil, out1: nil}
+		default:
+			panic(fmt.Sprintf("Unexpected ctype %v for token %s", ctype, token.name))
 		}
 		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
 		s.stp++

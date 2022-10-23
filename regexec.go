@@ -315,9 +315,12 @@ func (s *executorT[T]) step(pos int, clist []*nfaRegStateT[T], ch T, nlist []*nf
 			default:
 				panic(fmt.Sprintf("Unexpected meta '%v'", ns.meta))
 			}
+		case ntDynClass:
+			matches = ns.dynClass.Matches(ch)
+			dlog.Printf("Matches dynClass %s: %v", ns.cName, matches)
 		}
-		if matches {
 
+		if matches {
 			dlog.Printf("matched : %s", xns.Repr0())
 			for _, rn := range ns.startsRegisters {
 				// The matching character starts this register,
