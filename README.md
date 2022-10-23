@@ -2,8 +2,10 @@
 
 Regular expressions are convenient mechanisms for parsing
 strings. But what if you aren't analyzing strings?
-"Object" regular expressions are a way to use regular
+"Object regular expressions" are a way to use regular
 expressions on slices of arbitrary objects instead of strings.
+
+# Usage
 
 This library uses Go generics.  The objects involved in the regular
 must satisfy the "comparable" constraint.
@@ -19,6 +21,10 @@ class.
 Once you define the classes, you can write regular expressions using syntax
 similar to basic regular expression syntax.
 
+Objects do not have to belong to only one category. They can belong to as
+many categories as you want. The regular expression can also check that
+a single object matches (or doesn't match) more than one category.
+
 See the [module documentation](https://pkg.go.dev/github.com/gilramir/objregexp)
 
 # The Syntax
@@ -32,14 +38,14 @@ In this syntax:
         in it, except for ":". The name is not limited to ASCII or Latin
         code points.
 
-* Inside the "[" and "]" brackets:
+* Inside the "[" and "]" brackets of a class name:
     * A "!" before the ":" of a class name
         negates the test.  It looks for non-membership in the class.
     * A "&&" between 2 class names tests that the object belongs
-        to both classes. (TODO)
+        to both classes.
     * A "||" between 2 class names tests that the object belongs
-        to either class. (TODO)
-    * "(" and ")" can be used to group the "&" and "|" tests. (TODO)
+        to either class.
+    * "(" and ")" can be used to group the "&&" and "||" tests.
 
 * A "." matches any one object.
 
@@ -56,8 +62,9 @@ In this syntax:
 
 # Examples
 
-Here are some sample regexes, assuming that "vowel" and "consonant" are
-object classes;
+
+Here are some sample regexes, assuming that "vowel", "consonant",
+"lower" and "upper" are object classes.
 
 ---
     # Match any object
@@ -67,6 +74,7 @@ object classes;
     [:vowel:]
 
     # Match an object which is part of the "vowel" class.
+    # Save the value in a numbered "capture group" (aka, "register")
     ([:vowel:])
 
     # Match an object which is part of the "vowel" class,
@@ -76,12 +84,9 @@ object classes;
     # Match an object which is not part of the "vowel" class.
     [!:vowel:]
 
-    # Match an object which is part of the "vowel" class, and alos
-    # part of the lower-case class.
-    [:vowel: && :lower-case:] (TODO)
-
     # Match either a "vowel" object, or a "consonant" object
     # followed by a "vowel" object.
+    # Save the value in a numbered "capture group" (aka, "register")
     ([:vowel:] | [:consonant:] [:vowel:])
 
     # Match one or more vowel objects
@@ -93,6 +98,19 @@ object classes;
     # Match one or zero vowel objects
     [:vowel:]?
 ---
+
+You can test a single object against multiple classes, too.
+
+---
+    # Match an object which is part of the "vowel" class, and also
+    # part of the "lower" class.
+    [:vowel: && :lower:]
+
+    # Match an object which is either a lower-case vowel, or
+    # an upper-case consonant.
+    [ (:vowel: && :lower:) || (:consonant: && :upper:) ]
+---
+
 
 # Using objregexp
 
@@ -199,9 +217,9 @@ For example:
 
         m = regex.Match(objects)
         if m.Success {
-            span := m.Range
+            vSpan := m.Register(1)
             fmt.Println("The non-vowel group is at pos %d - %d",
-                span.Start, span.End)
+                vSpan.Start, vSpan.End)
         }
 ---
 
@@ -219,11 +237,15 @@ Regexp object.
 Files:
 
 * class.go - this defines the struct for Class
+* dynclass.go - code for dynamically combining classes with boolean logic
 * nfa.go - this generates the NFA (non-deterministic finite automata)
 * objregexp.go - this defines the Compiler and its methods
 * parse.go - this tokenizes the regex string
 * regexec.go - this executes the regex
 * regexp.go - this defines the Regexp class and its methods
+* runebuffer.go - simple buffer of runes used by the parsers in parse.go and
+  dynclass.go
+* stack.go - generic stack implementation
 
 Flow:
 
