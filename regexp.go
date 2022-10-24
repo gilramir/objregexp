@@ -93,14 +93,14 @@ func (s Match) Length() int {
 	return s.Range.Length()
 }
 
-func (s Match) HasRegister(n int) bool {
-	reg := s.Register(n)
+func (s Match) HasGroup(n int) bool {
+	reg := s.Group(n)
 	return reg.Start != -1 && reg.End != -1
 }
 
 // Get a numbered register from the Match. Every left parenthesis
 // in the regex gets a number, starting with 1.
-func (s Match) Register(n int) Range {
+func (s Match) Group(n int) Range {
 	if s.Success && n > 0 && n <= len(s.registers) {
 		return s.registers[n-1]
 	} else {

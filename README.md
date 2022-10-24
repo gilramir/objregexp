@@ -74,7 +74,7 @@ Here are some sample regexes, assuming that "vowel", "consonant",
     [:vowel:]
 
     # Match an object which is part of the "vowel" class.
-    # Save the value in a numbered "capture group" (aka, "register")
+    # Save the value in a numbered "capture group"
     ([:vowel:])
 
     # Match an object which is part of the "vowel" class,
@@ -86,7 +86,7 @@ Here are some sample regexes, assuming that "vowel", "consonant",
 
     # Match either a "vowel" object, or a "consonant" object
     # followed by a "vowel" object.
-    # Save the value in a numbered "capture group" (aka, "register")
+    # Save the value in a numbered "capture group"
     ([:vowel:] | [:consonant:] [:vowel:])
 
     # Match one or more vowel objects
@@ -204,7 +204,7 @@ matched, but it gives you the index position of the start and
 end of the match.
 
 If you used parens in your regular expressions,
-you can get the start and end positions for each of these "registers",
+you can get the start and end positions for each of these groups,
 based on their number, starting with 1.
 
 For example:
@@ -217,7 +217,7 @@ For example:
 
         m = regex.Match(objects)
         if m.Success {
-            vSpan := m.Register(1)
+            vSpan := m.Group(1)
             fmt.Println("The non-vowel group is at pos %d - %d",
                 vSpan.Start, vSpan.End)
         }

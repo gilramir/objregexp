@@ -136,8 +136,8 @@ func (s *MySuite) TestRegexp04a(c *C) {
 	c.Check(m.Success, Equals, true)
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 3)
-	c.Check(m.Register(1).Start, Equals, 1)
-	c.Check(m.Register(1).End, Equals, 2)
+	c.Check(m.Group(1).Start, Equals, 1)
+	c.Check(m.Group(1).End, Equals, 2)
 
 	/*
 		c.Assert(len(tokens), Equals, 5)
@@ -174,8 +174,8 @@ func (s *MySuite) TestRegexp04b(c *C) {
 	c.Check(m.Success, Equals, true)
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 3)
-	c.Check(m.Register(1).Start, Equals, 1)
-	c.Check(m.Register(1).End, Equals, 2)
+	c.Check(m.Group(1).Start, Equals, 1)
+	c.Check(m.Group(1).End, Equals, 2)
 }
 
 // Nested parens
@@ -198,10 +198,10 @@ func (s *MySuite) TestRegexp04c(c *C) {
 	c.Check(m.Success, Equals, true)
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 3)
-	c.Check(m.Register(1).Start, Equals, 1)
-	c.Check(m.Register(1).End, Equals, 3)
-	c.Check(m.Register(2).Start, Equals, 2)
-	c.Check(m.Register(2).End, Equals, 3)
+	c.Check(m.Group(1).Start, Equals, 1)
+	c.Check(m.Group(1).End, Equals, 3)
+	c.Check(m.Group(2).Start, Equals, 2)
+	c.Check(m.Group(2).End, Equals, 3)
 
 	/*
 		c.Assert(len(tokens), Equals, 5)
@@ -238,24 +238,24 @@ func (s *MySuite) TestRegexp04d(c *C) {
 	c.Check(m.Success, Equals, true)
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 5)
-	c.Check(m.Register(1).Start, Equals, 1)
-	c.Check(m.Register(1).End, Equals, 4)
+	c.Check(m.Group(1).Start, Equals, 1)
+	c.Check(m.Group(1).End, Equals, 4)
 
 	input = []rune{'8', 'A', 'E', '8'}
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 4)
-	c.Check(m.Register(1).Start, Equals, 1)
-	c.Check(m.Register(1).End, Equals, 3)
+	c.Check(m.Group(1).Start, Equals, 1)
+	c.Check(m.Group(1).End, Equals, 3)
 
 	input = []rune{'8', 'X', '8'}
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 3)
-	c.Check(m.Register(1).Start, Equals, 1)
-	c.Check(m.Register(1).End, Equals, 2)
+	c.Check(m.Group(1).Start, Equals, 1)
+	c.Check(m.Group(1).End, Equals, 2)
 }
 
 // Test Glob * for greediness

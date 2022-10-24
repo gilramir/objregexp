@@ -135,7 +135,7 @@ func (s *MySuite) TestNfa04(c *C) {
 	m := re.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Empty(), Equals, true)
 }
 
@@ -164,19 +164,19 @@ func (s *MySuite) TestNfa05(c *C) {
 	m := re.FullMatch(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
-	reg2 := m.Register(2)
+	reg2 := m.Group(2)
 	c.Assert(reg2.Start, Equals, 1)
 	c.Assert(reg2.End, Equals, 2)
 
-	reg3 := m.Register(3)
+	reg3 := m.Group(3)
 	c.Assert(reg3.Start, Equals, 2)
 	c.Assert(reg3.End, Equals, 3)
 
-	reg4 := m.Register(4)
+	reg4 := m.Group(4)
 	c.Assert(reg4.Start, Equals, 3)
 	c.Assert(reg4.End, Equals, 4)
 }
@@ -201,11 +201,11 @@ func (s *MySuite) TestNfa06(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
-	reg2 := m.Register(2)
+	reg2 := m.Group(2)
 	c.Assert(reg2.Start, Equals, 1)
 	c.Assert(reg2.End, Equals, 2)
 }
@@ -234,11 +234,11 @@ func (s *MySuite) TestNfa07(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
-	reg2 := m.Register(2)
+	reg2 := m.Group(2)
 	c.Assert(reg2.Start, Equals, 1)
 	c.Assert(reg2.End, Equals, 2)
 
@@ -247,11 +247,11 @@ func (s *MySuite) TestNfa07(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 2)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 2)
 	c.Assert(reg2.End, Equals, 3)
 
@@ -260,11 +260,11 @@ func (s *MySuite) TestNfa07(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, -1)
 	c.Assert(reg1.End, Equals, -1)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 0)
 	c.Assert(reg2.End, Equals, 1)
 }
@@ -292,11 +292,11 @@ func (s *MySuite) TestNfa08(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 2)
 
-	reg2 := m.Register(2)
+	reg2 := m.Group(2)
 	c.Assert(reg2.Start, Equals, 2)
 	c.Assert(reg2.End, Equals, 3)
 
@@ -305,11 +305,11 @@ func (s *MySuite) TestNfa08(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 2)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 2)
 	c.Assert(reg2.End, Equals, 4)
 
@@ -318,11 +318,11 @@ func (s *MySuite) TestNfa08(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 2)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 2)
 	c.Assert(reg2.End, Equals, 3)
 
@@ -331,11 +331,11 @@ func (s *MySuite) TestNfa08(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 1)
 	c.Assert(reg2.End, Equals, 2)
 
@@ -344,11 +344,11 @@ func (s *MySuite) TestNfa08(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 1)
 	c.Assert(reg2.End, Equals, 3)
 
@@ -357,11 +357,11 @@ func (s *MySuite) TestNfa08(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 1)
 	c.Assert(reg2.End, Equals, 2)
 }
@@ -385,7 +385,7 @@ func (s *MySuite) TestNfa09(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
@@ -394,7 +394,7 @@ func (s *MySuite) TestNfa09(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, -1)
 	c.Assert(reg1.End, Equals, -1)
 }
@@ -418,7 +418,7 @@ func (s *MySuite) TestNfa10(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 1)
 
@@ -427,7 +427,7 @@ func (s *MySuite) TestNfa10(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, -1)
 	c.Assert(reg1.End, Equals, -1)
 }
@@ -456,11 +456,11 @@ func (s *MySuite) TestNfa11(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 2)
 
-	reg2 := m.Register(2)
+	reg2 := m.Group(2)
 	c.Assert(reg2.Start, Equals, 2)
 	c.Assert(reg2.End, Equals, 3)
 
@@ -469,11 +469,11 @@ func (s *MySuite) TestNfa11(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 4)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 4)
 	c.Assert(reg2.End, Equals, 5)
 
@@ -482,11 +482,11 @@ func (s *MySuite) TestNfa11(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, -1)
 	c.Assert(reg1.End, Equals, -1)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 0)
 	c.Assert(reg2.End, Equals, 1)
 }
@@ -515,11 +515,11 @@ func (s *MySuite) TestNfa12(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 2)
 
-	reg2 := m.Register(2)
+	reg2 := m.Group(2)
 	c.Assert(reg2.Start, Equals, 2)
 	c.Assert(reg2.End, Equals, 3)
 
@@ -528,11 +528,11 @@ func (s *MySuite) TestNfa12(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 4)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 4)
 	c.Assert(reg2.End, Equals, 5)
 
@@ -564,11 +564,11 @@ func (s *MySuite) TestNfa13(c *C) {
 	m := re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 := m.Register(1)
+	reg1 := m.Group(1)
 	c.Assert(reg1.Start, Equals, 0)
 	c.Assert(reg1.End, Equals, 2)
 
-	reg2 := m.Register(2)
+	reg2 := m.Group(2)
 	c.Assert(reg2.Start, Equals, 2)
 	c.Assert(reg2.End, Equals, 3)
 
@@ -582,11 +582,11 @@ func (s *MySuite) TestNfa13(c *C) {
 	m = re.Match(input)
 	c.Check(m.Success, Equals, true)
 
-	reg1 = m.Register(1)
+	reg1 = m.Group(1)
 	c.Assert(reg1.Start, Equals, -1)
 	c.Assert(reg1.End, Equals, -1)
 
-	reg2 = m.Register(2)
+	reg2 = m.Group(2)
 	c.Assert(reg2.Start, Equals, 0)
 	c.Assert(reg2.End, Equals, 1)
 }
