@@ -21,7 +21,9 @@ import (
 type nfaFactory[T comparable] struct {
 	compiler *Compiler[T]
 
-	// stack pointer, and stack, while buildind the NFA stack (regexp)
+	// Stack pointer, and stack, while buildind the NFA stack (regexp)
+	// Literals push these NFA fragments onto the stack.
+	// Operators pop NFA fragments off ot the stack.
 	stp   int
 	stack []fragT[T]
 
@@ -71,7 +73,9 @@ const (
 
 // Important - once a regex is compiled, nothing in a nfaStateT can change.
 // Otherwise, a single regex cannot be used in multiple concurrent goroutines
+// The NFA is built from a linked collection of nfsStateT objects
 type nfaStateT[T comparable] struct {
+	// What type (class) of nfa node is this?
 	c nodeType
 
 	// oClass is set if c is ntClass
@@ -88,9 +92,9 @@ type nfaStateT[T comparable] struct {
 
 	// negation is valid for either oClass or iObj
 	negation bool
+
 	// meta is set if c is ntMeta
 	meta metaType
-	//	register int
 
 	out, out1 *nfaStateT[T]
 
@@ -99,9 +103,6 @@ type nfaStateT[T comparable] struct {
 	// (a closed paren)
 	startsRegisters []int
 	endsRegisters   []int
-
-	sRegPosOffsets []int
-	eRegPosOffsets []int
 }
 
 func stateListRepr[T comparable](stateList []*nfaStateT[T]) string {

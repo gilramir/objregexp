@@ -11,7 +11,9 @@ import (
 type executorT[T comparable] struct {
 	regex *Regexp[T]
 
-	// for stepping
+	// for stepping through the input objects, we need to keep track
+	// of each list, so we don't add an exStateT to it if it's already in
+	// it.
 	listid int
 
 	// Every State should have only 1 copy as an exState, so we need this
@@ -34,7 +36,8 @@ func (s *executorT[T]) Initialize(regex *Regexp[T]) {
 type exStateT[T comparable] struct {
 	st *nfaStateT[T]
 
-	// for the nfa
+	// This is used to check if this exStateT was already added
+	// to the list of states being modified by addstate()
 	lastlist int
 
 	out, out1 *exStateT[T]
@@ -164,6 +167,8 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 
 	xstart := s.exStateRecursive(start)
 
+	// clist is the current list of states
+	// nlist is the next set of states, after the current input object
 	var clist, nlist []*nfaRegStateT[T]
 	s.listid++
 	// first pos is = -1, in case SPLIT is the 1st nfa node
@@ -254,9 +259,14 @@ func (s *executorT[T]) addstate(pos int, l []*nfaRegStateT[T], nsx *nfaRegStateT
 		}
 		l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out, nsx.registers.Copy()})
 		l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out1, nsx.registers.Copy()})
+
+		// This return is missing in
+		// https://medium.com/@phanindramoganti/regex-under-the-hood-implementing-a-simple-regex-compiler-in-go-ef2af5c6079
+		// but is present in
+		// https://swtch.com/~rsc/regexp/regexp1.html
+		// We don't need or want it
+		return l
 	}
-	// TODO - I'm not sure why we append ns here if ns == NSPlit. Is it
-	// necessary?
 	l = append(l, nsx)
 	return l
 }

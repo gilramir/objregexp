@@ -164,6 +164,9 @@ func (s *Regexp[T]) Search(input []T) Match {
 	return s.SearchAt(input, 0)
 }
 
+// TODO - we need to efficiently find good starting positions
+// when the regexp makes it possible to do so.
+
 // Search every position within the input to match the Regex.
 // The match begins at the start position you give.
 func (s *Regexp[T]) SearchAt(input []T, start int) Match {
