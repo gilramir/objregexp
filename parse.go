@@ -35,8 +35,9 @@ type tokenT struct {
 	// negation is only used For tClass
 	negation bool
 
-	// For tEndReg, holds the register number
-	regNum int
+	// For tEndReg, holds the register number, and if present, regName
+	regNum  int
+	regName string
 
 	// An error caught during parsing, to cause the
 	// parse to fail, and to be reported to the user.
@@ -116,9 +117,10 @@ type reParserStateT struct {
 }
 
 type backc struct {
-	nbin           int
-	natom          int
-	beforeGroupNum int
+	nbin      int
+	natom     int
+	groupNum  int
+	groupName string
 }
 
 func (s *reParserStateT) Initialize(input string) {
@@ -156,7 +158,13 @@ func (s *reParserStateT) goparse() {
 			continue
 
 		case '(':
-			s.parseLParen()
+			ok, eof = s.parseLParen()
+			if !ok {
+				return
+			}
+			if eof {
+				break
+			}
 
 		case '|':
 			s.parsePipe()
@@ -198,7 +206,8 @@ func (s *reParserStateT) goparse() {
 	}
 }
 
-func (s *reParserStateT) parseLParen() {
+// returns ok, eof
+func (s *reParserStateT) parseLParen() (bool, bool) {
 
 	s.groupNumsAllocated++
 
@@ -210,13 +219,88 @@ func (s *reParserStateT) parseLParen() {
 
 	s.p[s.j].nbin = s.nbin
 	s.p[s.j].natom = s.natom
-	s.p[s.j].beforeGroupNum = s.groupNumsAllocated
+	s.p[s.j].groupNum = s.groupNumsAllocated
+
 	//dlog.Printf("pstack %d => %+v", s.j, s.p[s.j])
 	s.j++
 	s.ensure_stack_space()
 	s.nbin = 0
 	s.natom = 0
 
+	// is there a "?P<name>" after the lparen?
+	var name string
+	ok, r, eof := s.input.peekNextRune()
+	if !ok || eof {
+		return s.input.consumeNextRune()
+	}
+	if r == '?' {
+		s.input.consumeNextRune()
+		ok, name, eof = s.parseLParenQuestion()
+		if !ok || eof {
+			return ok, eof
+		}
+		s.p[s.j-1].groupName = name
+		return true, false
+	} else {
+		return true, false
+	}
+}
+
+const (
+	lpqExpectP   = 1 // "P"
+	lpqExpectLab = 2 // Left angled bracket
+	lpqExpectRab = 3 // Right angled bracket
+)
+
+// Parse "P<name>" after the "(?"
+// returns ok, groupName, eof
+func (s *reParserStateT) parseLParenQuestion() (bool, string, bool) {
+	var state int = lpqExpectP
+
+	groupRunes := make([]rune, 0, 10)
+
+	nameStartPos := 0
+inputLoop:
+	for {
+		// Get the next rune
+		ok, r, eof := s.input.getNextRune()
+		if !ok || eof {
+			return ok, "", eof
+		}
+
+		switch state {
+		case lpqExpectP:
+			if r == 'P' {
+				state = lpqExpectLab
+				continue
+			} else {
+				s.emitErrorf("Expected 'P' after '(?' at pos %d", s.input.pos)
+				return false, "", false
+			}
+		case lpqExpectLab:
+			if r == '<' {
+				state = lpqExpectRab
+				nameStartPos = s.input.pos
+				continue
+			} else {
+				s.emitErrorf("Expected '<' after '(?P' at pos %d", s.input.pos)
+				return false, "", false
+			}
+		case lpqExpectRab:
+			if r == '>' {
+				break inputLoop
+			} else {
+				groupRunes = append(groupRunes, r)
+				continue
+			}
+		}
+	}
+
+	if len(groupRunes) == 0 {
+		s.emitErrorf("The capture group name at pos %d is empty", nameStartPos)
+		return false, "", false
+	}
+	return true, string(groupRunes), false
 }
 
 func (s *reParserStateT) parsePipe() {
@@ -253,9 +337,10 @@ func (s *reParserStateT) parseRParen() {
 
 	// Now emit the tEndRegister
 	s.tokenChan <- tokenT{
-		ttype:  tEndRegister,
-		pos:    s.input.pos,
-		regNum: s.p[s.j].beforeGroupNum,
+		ttype:   tEndRegister,
+		pos:     s.input.pos,
+		regNum:  s.p[s.j].groupNum,
+		regName: s.p[s.j].groupName,
 	}
 }
 

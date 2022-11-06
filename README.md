@@ -52,6 +52,9 @@ In this syntax:
 * Parens can be used for grouping, both for the globs and for retrieving
   the range of objects after the match is successful.
 
+* Capture groups can be named, using the same syntax that Python regexes use:
+        (?P<name>.*)
+
 * Alternate choices are given via the vertical pipe: |
 
 * These "glob" patterns are supported: "+", "\*", and "?". They are greedy;

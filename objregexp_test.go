@@ -468,3 +468,67 @@ func (s *MySuite) TestDynClass02(c *C) {
 	m = re.FullMatch(input)
 	c.Check(m.Success, Equals, false)
 }
+
+func (s *MySuite) TestNamedGroup01(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.AddClass(LowerClass)
+	compiler.Finalize()
+
+	text := "[:digit:] (?P<con>[:consonant: && :lower:])"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'9', 'm'}
+	m := re.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+
+	rs := string(input[m.Group(1).Start:m.Group(1).End])
+	c.Check(rs, Equals, "m")
+	rs = string(input[m.GroupName("con").Start:m.GroupName("con").End])
+	c.Check(rs, Equals, "m")
+
+	c.Check(m.GroupName("none").Start, Equals, -1)
+	c.Check(m.GroupName("none").End, Equals, -1)
+}
+
+func (s *MySuite) TestNamedGroup02(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.AddClass(LowerClass)
+	compiler.Finalize()
+
+	text := "(?P<all> ([:digit:]) (?P<con>[:consonant: && :lower:]))"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'9', 'm'}
+	m := re.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+
+	/*
+		dlog.Printf("g1: %+v\n", m.Group(1))
+		dlog.Printf("gAll: %+v\n", m.GroupName("all"))
+		dlog.Printf("g2: %+v\n", m.Group(2))
+		dlog.Printf("g3: %+v\n", m.Group(3))
+		dlog.Printf("gCon: %+v\n", m.GroupName("con"))
+	*/
+	rs := string(input[m.Group(1).Start:m.Group(1).End])
+	c.Check(rs, Equals, "9m")
+	rs = string(input[m.Group(2).Start:m.Group(2).End])
+	c.Check(rs, Equals, "9")
+	rs = string(input[m.Group(3).Start:m.Group(3).End])
+	c.Check(rs, Equals, "m")
+
+	rs = string(input[m.GroupName("all").Start:m.GroupName("all").End])
+	c.Check(rs, Equals, "9m")
+
+	rs = string(input[m.GroupName("con").Start:m.GroupName("con").End])
+	c.Check(rs, Equals, "m")
+}

@@ -18,9 +18,8 @@ type Regexp[T comparable] struct {
 	// How many registers can be saved to by this regex
 	numRegisters int
 
-	// the register numbers that start at the beginning
-	// of the regex, before any other tokens
-	startRegisters []int
+	// Maps regNames to regNums
+	regNameMap map[string]int
 }
 
 // Write the NFA to a dot file, for visualization with graphviz
@@ -36,7 +35,7 @@ func (s *Regexp[T]) WriteDot(filename string) error {
 		return err
 	}
 
-	root := fmt.Sprintf("Root #r:%d sr:%v", s.numRegisters, s.startRegisters)
+	root := fmt.Sprintf("Root #r:%d", s.numRegisters)
 
 	_, err = fmt.Fprintf(fh, "\troot [label=\"%s\"]\n", root)
 	if err != nil {
@@ -78,6 +77,8 @@ func (s Range) Empty() bool {
 }
 
 // Returned by a Regexp matching-related function.
+// Even if the Regexp doesn't match, a Match object is returned,
+// but Success is false.
 type Match struct {
 	// Did the Regexp find something?
 	Success bool
@@ -85,27 +86,49 @@ type Match struct {
 	// The range for the entire sub-string that matched
 	Range Range
 
-	registers []Range
-	//	Group   map[string]Range
+	registers  []Range
+	regNameMap map[string]int
 }
 
+// How many objects did this regexp match? This is for
+// the entire regexp, not any capture group within it.
 func (s Match) Length() int {
 	return s.Range.Length()
 }
 
+// Does the numbered capture group have any objects?
+// Every left parenthesis in the regex gets a number, starting with 1.
 func (s Match) HasGroup(n int) bool {
 	reg := s.Group(n)
 	return reg.Start != -1 && reg.End != -1
 }
 
-// Get a numbered register from the Match. Every left parenthesis
-// in the regex gets a number, starting with 1.
+// Does the named capture group have any objects?
+func (s Match) HasGroupName(name string) bool {
+	regNum, has := s.regNameMap[name]
+	if !has {
+		return false
+	}
+	return s.HasGroup(regNum)
+}
+
+// Get a numbered capture group from the Match object.
+// Every left parenthesis in the regex gets a number, starting with 1.
 func (s Match) Group(n int) Range {
 	if s.Success && n > 0 && n <= len(s.registers) {
 		return s.registers[n-1]
 	} else {
 		return Range{-1, -1}
 	}
+}
+
+// Get a named capture group from the Match object.
+func (s Match) GroupName(name string) Range {
+	regNum, has := s.regNameMap[name]
+	if !has {
+		return Range{-1, -1}
+	}
+	return s.Group(regNum)
 }
 
 // Match the regex against the input, to the end of the input.
@@ -145,15 +168,15 @@ func (s *Regexp[T]) matchAt(input []T, start int, full bool) Match {
 				Start: start,
 				End:   start + n,
 			},
-			registers: make([]Range, s.numRegisters),
-			//Group: vars,
+			registers:  make([]Range, s.numRegisters),
+			regNameMap: s.regNameMap,
 		}
 		copy(m.registers, xns.registers.ranges)
 		return m
 	} else {
 		return Match{
-			Success: false,
-			//Group:   make(map[string]Range),
+			Success:    false,
+			regNameMap: s.regNameMap,
 		}
 	}
 }

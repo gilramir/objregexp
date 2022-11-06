@@ -17,9 +17,9 @@ func (s *runeBufferT) Initialize(input string) {
 }
 
 // Return ok, rune, eof, and advances the pointer
-// If not ok, this function calls emitRuneError, via _peekNextRune
+// If not ok, this function calls runeErrorCb, via _peekNextRune
 func (s *runeBufferT) getNextRune() (bool, rune, bool) {
-	ok, r, size, eof := s._peekNextRune()
+	ok, r, size, eof := s._peekNextRune(true)
 	if !ok {
 		return false, 0, false
 	}
@@ -31,15 +31,16 @@ func (s *runeBufferT) getNextRune() (bool, rune, bool) {
 }
 
 // Return ok, rune, eof, but does not advance the pointer
+// on error, this does *not* call runeErrorCb.
 func (s *runeBufferT) peekNextRune() (bool, rune, bool) {
-	ok, r, _, eof := s._peekNextRune()
+	ok, r, _, eof := s._peekNextRune(false)
 	return ok, r, eof
 }
 
 // Advances the pointer by 1 rune
-// If not ok, this function calls emitRuneError, via _peekNextRune
+// If not ok, this function calls runeErrorCb, via _peekNextRune
 func (s *runeBufferT) consumeNextRune() (bool, bool) {
-	ok, _, size, eof := s._peekNextRune()
+	ok, _, size, eof := s._peekNextRune(true)
 	if ok && !eof {
 		s.pos += size
 	}
@@ -47,15 +48,15 @@ func (s *runeBufferT) consumeNextRune() (bool, bool) {
 }
 
 // Internal helper for get/peek/consume- NextRune()
-// If not ok, this function calls emitRuneErro
-func (s *runeBufferT) _peekNextRune() (bool, rune, int, bool) {
+// If not ok, this function calls runeErrorCb
+func (s *runeBufferT) _peekNextRune(useCb bool) (bool, rune, int, bool) {
 	// EOS?
 	if s.pos == len(s.input) {
 		return true, utf8.RuneError, 0, true
 	}
 	r, size := utf8.DecodeRuneInString(s.input[s.pos:])
 	if r == utf8.RuneError {
-		if s.runeErrorCb != nil {
+		if useCb && s.runeErrorCb != nil {
 			s.runeErrorCb()
 		}
 		return false, utf8.RuneError, size, false

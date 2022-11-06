@@ -29,12 +29,16 @@ type nfaFactory[T comparable] struct {
 
 	// how many registers are addressed by this regex
 	numRegisters int
+
+	// Maps regNames to regNums
+	regNameMap map[string]int
 }
 
 func newNfaFactory[T comparable](compiler *Compiler[T]) *nfaFactory[T] {
 	return &nfaFactory[T]{
-		compiler: compiler,
-		stack:    make([]fragT[T], 0),
+		compiler:   compiler,
+		stack:      make([]fragT[T], 0),
+		regNameMap: make(map[string]int),
 	}
 }
 
@@ -389,7 +393,7 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 		// An EndRegister cannot exist on an ntSplit node. It is pushed
 		// down onto the final leavs of the ntSplit node/tree (ending up
 		// on the er slices)
-		dlog.Printf("tEndRegister reg#%d", token.regNum)
+		dlog.Printf("tEndRegister reg#%d name %s", token.regNum, token.regName)
 
 		ns := s.stack[s.stp-1].start
 		ns.startsRegisters = append(ns.startsRegisters, token.regNum)
@@ -397,6 +401,12 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 
 		if token.regNum > s.numRegisters {
 			s.numRegisters = token.regNum
+		}
+		if token.regName != "" {
+			if registeredNum, has := s.regNameMap[token.regName]; has {
+				panic(fmt.Sprintf("reg#%d has name %s but it was seen with #%d", token.regNum, token.regName, registeredNum))
+			}
+			s.regNameMap[token.regName] = token.regNum
 		}
 
 	default:
@@ -437,6 +447,7 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 	}
 	re := &Regexp[T]{
 		numRegisters: s.numRegisters,
+		regNameMap:   s.regNameMap,
 	}
 	re.matchstate.c = ntMatch
 
