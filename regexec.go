@@ -229,10 +229,13 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 			return false, 0, nil
 		}
 	} else {
-		dlog.Printf("FINISHED and stored hit %+v", hit)
+		dlog.Printf("FINISHED with stored hit %+v", hit)
 		if hit.x != nil {
 			// now we can return
 			return true, hit.length, hit.x
+		}
+		if matched, xns := s.matchesEnd(len(input)-from, clist); matched {
+			return true, len(input) - from, xns
 		}
 		// If we weren't looking for a full match, and didn't already find
 		// it, then we didn't find it.
@@ -348,7 +351,10 @@ func (s *executorT[T]) step(pos int, clist []*nfaRegStateT[T], ch T, nlist []*nf
 				panic("should not reach")
 
 			case mtAssertEnd:
-				panic("should not reach")
+				// if we reached mtAssertEnd in step(),
+				// then we haven't finished looping over
+				// the input, so it's not a match
+				matches = false
 
 			default:
 				panic(fmt.Sprintf("Unexpected meta '%v'", ns.meta))
@@ -387,6 +393,22 @@ func (s *executorT[T]) ismatch(pos int, l []*nfaRegStateT[T]) (bool, *nfaRegStat
 		if ns == s.matchstate {
 			for _, rn := range ns.st.endsRegisters {
 				dlog.Printf("ismatch setting end reg #%d = pos %d", rn, pos)
+				regs.ranges[rn-1].End = pos
+			}
+			dlog.Printf("matched; registers: %+v", nsr.registers.ranges)
+			return true, nsr
+		}
+	}
+	return false, nil
+}
+
+func (s *executorT[T]) matchesEnd(pos int, l []*nfaRegStateT[T]) (bool, *nfaRegStateT[T]) {
+	for _, nsr := range l {
+		ns := nsr.root
+		regs := nsr.registers
+		if ns.st.c == ntMeta && ns.st.meta == mtAssertEnd {
+			for _, rn := range ns.st.endsRegisters {
+				dlog.Printf("matchesEnd setting end reg #%d = pos %d", rn, pos)
 				regs.ranges[rn-1].End = pos
 			}
 			dlog.Printf("matched; registers: %+v", nsr.registers.ranges)

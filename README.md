@@ -51,6 +51,8 @@ In this syntax:
 
 * "^" matches the beginning of the input.
 
+* "$" matches the end of the input.
+
 * Parens can be used for grouping, both for the globs and for retrieving
   the range of objects after the match is successful.
 
