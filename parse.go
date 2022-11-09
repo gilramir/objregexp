@@ -21,6 +21,8 @@ const (
 	tGlobQuestion            = "?" // ?
 	tAny                     = "A" // .
 	tEndRegister             = ")" // Record info about the close paren
+	tAssertBegin             = "^"
+	tAssertEnd               = "$"
 )
 
 type tokenT struct {
@@ -179,7 +181,13 @@ func (s *reParserStateT) goparse() {
 			s.parseLBracket()
 
 		case '.':
-			s.parseAny()
+			s.parseSimpleToken(tAny)
+
+		case '^':
+			s.parseSimpleToken(tAssertBegin)
+
+		case '$':
+			s.parseSimpleToken(tAssertEnd)
 
 		default:
 			s.emitErrorf("Syntax error at pos %d starting with '%c'", s.input.pos, r)
@@ -372,13 +380,13 @@ func (s *reParserStateT) parseGlob(r rune) {
 	}
 }
 
-func (s *reParserStateT) parseAny() {
+func (s *reParserStateT) parseSimpleToken(ttype tokenTypeT) {
 	if s.natom > 1 {
 		s.natom--
 		s.emitConcatenation()
 	}
 	s.tokenChan <- tokenT{
-		ttype: tAny,
+		ttype: ttype,
 		pos:   s.input.pos,
 	}
 	s.natom++

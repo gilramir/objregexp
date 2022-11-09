@@ -50,22 +50,16 @@ func (s *nfaFactory[T]) stackRepr() string {
 	return repr
 }
 
-/*
- Represents an NFA state plus zero or one or two arrows exiting.
- if c == nClass, it's something to match (Class), and only out is set
- if c == ntMatch, no arrows out; matching state.
- If c == ntSplit, unlabeled arrows to out and out1 (if != NULL).
-
-*/
+// The type of nfa node
 type nodeType int
 
 const (
-	ntClass nodeType = iota
-	ntIdentity
-	ntDynClass
-	ntMeta
-	ntMatch
-	ntSplit
+	ntClass    nodeType = iota // matches a Class
+	ntIdentity                 // matches an Identity
+	ntDynClass                 // matches a DynClass
+	ntMeta                     // a meta symbol
+	ntMatch                    // the match state
+	ntSplit                    // a split node
 )
 
 type metaType int
@@ -73,8 +67,11 @@ type metaType int
 const (
 	// An unitialized MetaT will be 0 but with no enum name
 	mtAny metaType = iota + 1
+	mtAssertBegin
+	mtAssertEnd
 )
 
+// Represents an NFA state plus zero or one or two arrows exiting.
 // Important - once a regex is compiled, nothing in a nfaStateT can change.
 // Otherwise, a single regex cannot be used in multiple concurrent goroutines
 // The NFA is built from a linked collection of nfsStateT objects
@@ -128,6 +125,10 @@ func (s *nfaStateT[T]) Repr0() string {
 		switch s.meta {
 		case mtAny:
 			label = "ANY"
+		case mtAssertBegin:
+			label = "^"
+		case mtAssertEnd:
+			label = "$"
 		default:
 			label = "MT?"
 		}
@@ -162,6 +163,10 @@ func (s *nfaStateT[T]) Repr0Dot() string {
 		switch s.meta {
 		case mtAny:
 			label = "ANY"
+		case mtAssertBegin:
+			label = "^"
+		case mtAssertEnd:
+			label = "$"
 		default:
 			label = "MT?"
 		}
@@ -385,6 +390,18 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 
 	case tAny:
 		ns := nfaStateT[T]{c: ntMeta, meta: mtAny, out: nil, out1: nil}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
+		s.stp++
+		s.ensure_stack_space()
+
+	case tAssertBegin:
+		ns := nfaStateT[T]{c: ntMeta, meta: mtAssertBegin, out: nil, out1: nil}
+		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
+		s.stp++
+		s.ensure_stack_space()
+
+	case tAssertEnd:
+		ns := nfaStateT[T]{c: ntMeta, meta: mtAssertEnd, out: nil, out1: nil}
 		s.stack[s.stp] = fragT[T]{&ns, []**nfaStateT[T]{&ns.out}, []int{}}
 		s.stp++
 		s.ensure_stack_space()

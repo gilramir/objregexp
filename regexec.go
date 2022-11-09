@@ -184,13 +184,25 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 		dlog.Printf("=========================================")
 		dlog.Printf("Input #%d: %v", i, ch)
 		dlog.Printf("clist has %d items:", len(clist))
+
+		// do any of the initial states in clist refer to ^ ?
+		/*
+			var filteredClist  []*nfaRegStateT[T]
+			for _, cxsr := range clist {
+				cxs := cxsr.root
+				if cxs.c == ntMeta {
+				    if cxs.meta == mtAssertBegin {
+				}
+			    }
+			}
+		*/
 		for cxi, cxsr := range clist {
 			cxs := cxsr.root
 			dlog.Printf("clist item #%d regs:%v\n%s", cxi, cxsr.registers.ranges, cxs.Repr())
 		}
+
 		nlist = s.step(i, clist, ch, nlist)
 		clist, nlist = nlist, clist
-		//		dlog.Printf("\tnew clist: %s", exStateListRepr(clist))
 
 		if !full {
 			if matched, xns := s.ismatch(i+1, clist); matched {
@@ -198,7 +210,7 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 				dlog.Printf("MATCHED and stored hit %+v", hit)
 				// keep going
 			} else {
-				dlog.Printf("NO MATCH and stored hit %+v\n", hit)
+				dlog.Printf("NO MATCH; prev hit was %+v\n", hit)
 				if hit.x != nil {
 					// now we can return
 					return true, hit.length, hit.x
@@ -206,6 +218,9 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 			}
 		}
 	}
+
+	// After the loop, match any $ tokens
+
 	if full {
 		// If looking for a full match, did we match at the end?
 		if matched, xns := s.ismatch(len(input)-from, clist); matched {
@@ -267,7 +282,14 @@ func (s *executorT[T]) addstate(pos int, l []*nfaRegStateT[T], nsx *nfaRegStateT
 		// We don't need or want it
 		return l
 	}
-	l = append(l, nsx)
+	if ns.st.c == ntMeta && ns.st.meta == mtAssertBegin {
+		if pos == -1 {
+			l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out, nsx.registers.Copy()})
+		}
+		// if pos > -1, ^ won't match, so don't add it
+	} else {
+		l = append(l, nsx)
+	}
 	return l
 }
 
@@ -321,6 +343,12 @@ func (s *executorT[T]) step(pos int, clist []*nfaRegStateT[T], ch T, nlist []*nf
 			switch ns.meta {
 			case mtAny:
 				matches = true
+
+			case mtAssertBegin:
+				panic("should not reach")
+
+			case mtAssertEnd:
+				panic("should not reach")
 
 			default:
 				panic(fmt.Sprintf("Unexpected meta '%v'", ns.meta))

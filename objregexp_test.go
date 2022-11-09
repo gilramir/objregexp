@@ -532,3 +532,64 @@ func (s *MySuite) TestNamedGroup02(c *C) {
 	rs = string(input[m.GroupName("con").Start:m.GroupName("con").End])
 	c.Check(rs, Equals, "m")
 }
+
+func (s *MySuite) TestAssertBegin01(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(DigitClass)
+	compiler.Finalize()
+
+	text := "^[:digit:]"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'9'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+}
+
+func (s *MySuite) TestAssertBegin02(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(DigitClass)
+	compiler.AddClass(LowerClass)
+	compiler.Finalize()
+
+	text := "(^|[:digit:]) [:lower:]"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'9'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, false)
+
+	input = []rune{'9', 'm'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Group(1).Start, Equals, 0)
+	c.Check(m.Group(1).End, Equals, 1)
+
+	input = []rune{'m'}
+	m = re.Match(input)
+	c.Check(m.Success, Equals, true)
+}
+
+/*
+func (s *MySuite) TestAssertEnd01(c *C) {
+
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(DigitClass)
+	compiler.Finalize()
+
+	text := "[:digit:]$"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'9'}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+}
+*/

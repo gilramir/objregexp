@@ -49,6 +49,8 @@ In this syntax:
 
 * A "." matches any one object.
 
+* "^" matches the beginning of the input.
+
 * Parens can be used for grouping, both for the globs and for retrieving
   the range of objects after the match is successful.
 
