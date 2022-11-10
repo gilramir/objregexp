@@ -11,6 +11,12 @@ import (
 type executorT[T comparable] struct {
 	regex *Regexp[T]
 
+	// The integer which represents the starting position before
+	// the first one. If we start matching at pos 0, prePos is -1
+	// This isn't used for the register -1 value (uninitialized).
+	// It's only for the "pos" in addstate()
+	prePos int
+
 	// for stepping through the input objects, we need to keep track
 	// of each list, so we don't add an exStateT to it if it's already in
 	// it.
@@ -171,9 +177,10 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 	// nlist is the next set of states, after the current input object
 	var clist, nlist []*nfaRegStateT[T]
 	s.listid++
-	// first pos is = -1, in case SPLIT is the 1st nfa node
 	dlog.Printf("calling addstate on root nfa")
-	clist = s.addstate(-1, clist, &nfaRegStateT[T]{xstart, s.newRegisters()})
+
+	s.prePos = from - 1
+	clist = s.addstate(s.prePos, clist, &nfaRegStateT[T]{xstart, s.newRegisters()})
 
 	// Keep track of matches because we want to be a little greedy
 	// and not return too early
@@ -185,17 +192,6 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 		dlog.Printf("Input #%d: %v", i, ch)
 		dlog.Printf("clist has %d items:", len(clist))
 
-		// do any of the initial states in clist refer to ^ ?
-		/*
-			var filteredClist  []*nfaRegStateT[T]
-			for _, cxsr := range clist {
-				cxs := cxsr.root
-				if cxs.c == ntMeta {
-				    if cxs.meta == mtAssertBegin {
-				}
-			    }
-			}
-		*/
 		for cxi, cxsr := range clist {
 			cxs := cxsr.root
 			dlog.Printf("clist item #%d regs:%v\n%s", cxi, cxsr.registers.ranges, cxs.Repr())
@@ -260,10 +256,7 @@ func (s *executorT[T]) addstate(pos int, l []*nfaRegStateT[T], nsx *nfaRegStateT
 		for _, rn := range ns.st.startsRegisters {
 			dlog.Printf("addstate setting start reg #%d = pos %d", rn, pos)
 			// The matching character starts this register,
-			// unless it was already seen (due to "*" glob)
-			//			if regs.ranges[rn-1].Start == -1 {
 			regs.ranges[rn-1].Start = pos + 1
-			//			}
 		}
 		for _, rn := range ns.st.endsRegisters {
 			dlog.Printf("addstate setting end reg #%d = pos %d", rn, pos)
@@ -286,10 +279,10 @@ func (s *executorT[T]) addstate(pos int, l []*nfaRegStateT[T], nsx *nfaRegStateT
 		return l
 	}
 	if ns.st.c == ntMeta && ns.st.meta == mtAssertBegin {
-		if pos == -1 {
+		if pos == s.prePos {
 			l = s.addstate(pos, l, &nfaRegStateT[T]{ns.out, nsx.registers.Copy()})
 		}
-		// if pos > -1, ^ won't match, so don't add it
+		// if pos > s.prePos, ^ won't match, so don't add it
 	} else {
 		l = append(l, nsx)
 	}

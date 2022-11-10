@@ -329,6 +329,7 @@ func (s *MySuite) TestRegexpGlob02(c *C) {
 }
 
 // Test Glob ? for greediness
+// Test Glob ? for greediness
 func (s *MySuite) TestRegexpGlob03(c *C) {
 	var compiler Compiler[rune]
 	compiler.Initialize()
@@ -358,4 +359,31 @@ func (s *MySuite) TestRegexpGlob03(c *C) {
 	c.Check(m.Success, Equals, true)
 	c.Check(m.Range.Start, Equals, 0)
 	c.Check(m.Range.End, Equals, 1)
+}
+
+func (s *MySuite) TestRegexpGroup01(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.AddClass(ConsonantClass)
+	compiler.AddClass(DigitClass)
+	compiler.Finalize()
+
+	text := "([:digit:]|[:vowel:][:consonant:]) ([:digit:])"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{'a', 'm', '9', '0'}
+	m := re.MatchAt(input, 2)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 2)
+	c.Check(m.Range.End, Equals, 4)
+
+	g := m.Group(1)
+	c.Check(g.Start, Equals, 2)
+	c.Check(g.End, Equals, 3)
+
+	g = m.Group(2)
+	c.Check(g.Start, Equals, 3)
+	c.Check(g.End, Equals, 4)
 }
