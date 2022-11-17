@@ -22,6 +22,25 @@ type Regexp[T comparable] struct {
 	regNameMap map[string]int
 }
 
+// Does this regex only match at the beginning of the input?
+// That is, must ^ be satisified always for this regexp?
+func (s *Regexp[T]) OnlyMatchesAtBeginning() bool {
+	//	log.Printf("nfa: %s", s.nfa.Repr())
+	return s.onlyMatchesAtBeginning(s.nfa)
+}
+
+func (s *Regexp[T]) onlyMatchesAtBeginning(nfa *nfaStateT[T]) bool {
+	switch nfa.c {
+	case ntMeta:
+		return nfa.meta == mtAssertBegin
+	case ntSplit:
+		return s.onlyMatchesAtBeginning(nfa.out) &&
+			s.onlyMatchesAtBeginning(nfa.out1)
+	default:
+		return false
+	}
+}
+
 // Write the NFA to a dot file, for visualization with graphviz
 func (s *Regexp[T]) WriteDot(filename string) error {
 	fh, err := os.Create(filename)
@@ -183,8 +202,14 @@ func (s *Regexp[T]) matchAt(input []T, start int, full bool) Match {
 
 // Search every position within the input to match the Regex.
 // The match begins at input position 0.
+// If the regexp can only possibly match at at the beinning of
+// the input, then this reverts to MatchAt(0)
 func (s *Regexp[T]) Search(input []T) Match {
-	return s.SearchAt(input, 0)
+	if s.OnlyMatchesAtBeginning() {
+		return s.MatchAt(input, 0)
+	} else {
+		return s.SearchAt(input, 0)
+	}
 }
 
 // TODO - we need to efficiently find good starting positions
