@@ -1,6 +1,7 @@
 package objregexp
 
-// From https://github.com/AlexandreChamard/go-generic
+// Modified
+// from https://github.com/AlexandreChamard/go-generic
 
 /*
 Copyright (c) 2022 Alexandre Chamard-Bois
@@ -25,7 +26,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-type Stack[T any] interface {
+type stackT[T any] interface {
 	Empty() bool
 	Size() int
 	Top() T
@@ -33,13 +34,13 @@ type Stack[T any] interface {
 	Pop()
 }
 
-func NewStack[T any]() Stack[T] { return &stackT[T]{} }
+func NewStack[T any]() stackT[T] { return &istackT[T]{} }
 
-type stackT[T any] []T
+type istackT[T any] []T
 
-func (this stackT[T]) Empty() bool  { return this.Size() == 0 }
-func (this stackT[T]) Size() int    { return len(this) }
-func (this stackT[T]) Top() T       { return this[len(this)-1] }
-func (this stackT[T]) TopPtr() *T   { return &this[len(this)-1] }
-func (this *stackT[T]) Push(info T) { *this = append(*this, info) }
-func (this *stackT[T]) Pop()        { *this = (*this)[:len(*this)-1] }
+func (this istackT[T]) Empty() bool  { return this.Size() == 0 }
+func (this istackT[T]) Size() int    { return len(this) }
+func (this istackT[T]) Top() T       { return this[len(this)-1] }
+func (this istackT[T]) TopPtr() *T   { return &this[len(this)-1] }
+func (this *istackT[T]) Push(info T) { *this = append(*this, info) }
+func (this *istackT[T]) Pop()        { *this = (*this)[:len(*this)-1] }

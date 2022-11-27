@@ -246,7 +246,7 @@ type dcTokenT struct {
 type dcParserStateT[T comparable] struct {
 	input runeBufferT
 	ops   []dynClassOpT[T]
-	stack Stack[dcTokenT]
+	stack stackT[dcTokenT]
 
 	nextJumpTarget int
 
