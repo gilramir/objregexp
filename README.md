@@ -73,7 +73,7 @@ In this syntax:
 Here are some sample regexes, assuming that "vowel", "consonant",
 "lower" and "upper" are object classes.
 
----
+```
     # Match any object
     .
 
@@ -104,11 +104,11 @@ Here are some sample regexes, assuming that "vowel", "consonant",
 
     # Match one or zero vowel objects
     [:vowel:]?
----
+```
 
 You can test a single object against multiple classes, too.
 
----
+```
     # Match an object which is part of the "vowel" class, and also
     # part of the "lower" class.
     [:vowel: && :lower:]
@@ -116,7 +116,7 @@ You can test a single object against multiple classes, too.
     # Match an object which is either a lower-case vowel, or
     # an upper-case consonant.
     [ (:vowel: && :lower:) || (:consonant: && :upper:) ]
----
+```
 
 
 # Using objregexp
@@ -129,7 +129,7 @@ will hold the object classes you define.
 In this example, the object type we consider is a rune, but
 it can be any object type which satisfies the "comparable" constraint.
 
----
+```
     import (
             "github.com/gilramir/objregexp"
     )
@@ -168,7 +168,7 @@ it can be any object type which satisfies the "comparable" constraint.
             // it can compile regexes
             compiler.Finalize()
     }
----
+```
 
 
 ## Compile the Regexp
@@ -177,21 +177,21 @@ Once you have defined
 all your object classes, use the Compiler object to compile
 regular expressions into Regexp objects.
 
----
+```
         pattern = "[:vowel:]* [:lower x:]"
         regex, err := compiler.Compile(pattern)
----
+```
 
 ## Use the Regexp on a slice of objects
 
----
+```
         objects := []rune{ 'A', 'E', 'I', 'x' }
 
         m = regex.Match(objects)
         if m.Success {
             fmt.Println("Success!")
         }
----
+```
 
 The Regexp class has a few different methods for trying
 the regular expression on a slice of objects:
@@ -216,7 +216,7 @@ based on their number, starting with 1.
 
 For example:
 
----
+```
         pattern = "[:vowel:] ([!:vowel:])"
         regex, err := compiler.Compile(pattern)
 
@@ -228,7 +228,7 @@ For example:
             fmt.Println("The non-vowel group is at pos %d - %d",
                 vSpan.Start, vSpan.End)
         }
----
+```
 
 # Concurrency
 
@@ -266,3 +266,14 @@ is tokenzied by code in parse.go.
 4. When the Regexp object is used to match a sequence, an executorT
 object is created in regexec.go. That executorT object carries
 the state used while traversing the sequence of objects.
+
+# Bugs
+
+A regexp that matches on an empty list of objects won't actually
+match on an empty list of objects. For example, this regexp:
+
+```
+[:some class:]*
+```
+
+will fail to match an empty list of objects.
