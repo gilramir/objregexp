@@ -36,7 +36,7 @@ type dynClassOpT[T comparable] struct {
 	iObj T
 
 	// cName is set if opType is dcClass or dcIdentity
-	// TODO - do I need this?
+	// This is only used for debugging.
 	cName string
 
 	// If this is a jump, which instruction to jump to

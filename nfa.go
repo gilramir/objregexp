@@ -470,6 +470,7 @@ func (s *nfaFactory[T]) compile(text string) (*Regexp[T], error) {
 
 	s.patch(e, e.out, &re.matchstate)
 	re.nfa = e.start
+	re.initialObj = re.mustStartWith()
 
 	// Dump it.
 	dlog.Printf("nfa:\n%s", re.nfa.Repr())

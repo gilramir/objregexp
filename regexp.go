@@ -20,24 +20,53 @@ type Regexp[T comparable] struct {
 
 	// Maps regNames to regNums
 	regNameMap map[string]int
+
+	// Does the regexp need to start with some specific object?
+	// This helps the Search() method.
+	initialObj *nfaStateT[T]
 }
 
 // Does this regex only match at the beginning of the input?
 // That is, must ^ be satisified always for this regexp?
-func (s *Regexp[T]) OnlyMatchesAtBeginning() bool {
+func (s *Regexp[T]) onlyMatchesAtBeginning() bool {
 	//	log.Printf("nfa: %s", s.nfa.Repr())
-	return s.onlyMatchesAtBeginning(s.nfa)
+	return s.onlyMatchesAtBeginningRecursive(s.nfa)
 }
 
-func (s *Regexp[T]) onlyMatchesAtBeginning(nfa *nfaStateT[T]) bool {
+func (s *Regexp[T]) onlyMatchesAtBeginningRecursive(nfa *nfaStateT[T]) bool {
 	switch nfa.c {
 	case ntMeta:
 		return nfa.meta == mtAssertBegin
 	case ntSplit:
-		return s.onlyMatchesAtBeginning(nfa.out) &&
-			s.onlyMatchesAtBeginning(nfa.out1)
+		return s.onlyMatchesAtBeginningRecursive(nfa.out) &&
+			s.onlyMatchesAtBeginningRecursive(nfa.out1)
 	default:
 		return false
+	}
+}
+
+// Does this regex only match at the beginning of the input?
+// If an nfaStateT is returned, it will be an ntClass,
+// ntIdentity, or ntDynClass. Otherwise, nil is returned.
+func (s *Regexp[T]) mustStartWith() *nfaStateT[T] {
+	switch s.nfa.c {
+	case ntClass:
+		return &nfaStateT[T]{
+			c:      s.nfa.c,
+			oClass: s.nfa.oClass,
+		}
+	case ntIdentity:
+		return &nfaStateT[T]{
+			c:    s.nfa.c,
+			iObj: s.nfa.iObj,
+		}
+	case ntDynClass:
+		return &nfaStateT[T]{
+			c:        s.nfa.c,
+			dynClass: s.nfa.dynClass,
+		}
+	default:
+		return nil
 	}
 }
 
@@ -205,27 +234,47 @@ func (s *Regexp[T]) matchAt(input []T, start int, full bool) Match {
 // If the regexp can only possibly match at at the beinning of
 // the input, then this reverts to MatchAt(0)
 func (s *Regexp[T]) Search(input []T) Match {
-	if s.OnlyMatchesAtBeginning() {
+	if s.onlyMatchesAtBeginning() {
 		return s.MatchAt(input, 0)
 	} else {
 		return s.SearchAt(input, 0)
 	}
 }
 
-// TODO - we need to efficiently find good starting positions
-// when the regexp makes it possible to do so.
-
 // Search every position within the input to match the Regex.
 // The match begins at the start position you give.
+// If the regexp must have a specific starting object class,
+// use that to narrow the search space.
 func (s *Regexp[T]) SearchAt(input []T, start int) Match {
-	// We could reduce the search by knowing the minimum sequence
-	// of matchable items in the regex. But we don't have a way
-	// to calculate that yet
 
-	for i := start; i < len(input); i++ {
-		m := s.MatchAt(input, i)
-		if m.Success {
-			return m
+	if s.initialObj != nil {
+		// Do a quick test of each object before calling
+		// regexp.Match()
+		for i := start; i < len(input); i++ {
+			ch := input[i]
+			var iMatch bool
+			switch s.initialObj.c {
+			case ntClass:
+				iMatch = s.initialObj.oClass.Matches(ch)
+			case ntIdentity:
+				iMatch = s.initialObj.iObj == ch
+			case ntDynClass:
+				iMatch = s.initialObj.dynClass.Matches(ch)
+			}
+			if iMatch {
+				m := s.MatchAt(input, i)
+				if m.Success {
+					return m
+				}
+			}
+		}
+	} else {
+		// Call regexp.Match on each object
+		for i := start; i < len(input); i++ {
+			m := s.MatchAt(input, i)
+			if m.Success {
+				return m
+			}
 		}
 	}
 
