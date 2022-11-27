@@ -228,6 +228,8 @@ func (s *reParserStateT) parseLParen() (bool, bool) {
 	s.p[s.j].nbin = s.nbin
 	s.p[s.j].natom = s.natom
 	s.p[s.j].groupNum = s.groupNumsAllocated
+	// Always reset this
+	s.p[s.j].groupName = ""
 
 	//dlog.Printf("pstack %d => %+v", s.j, s.p[s.j])
 	s.j++
@@ -344,6 +346,13 @@ func (s *reParserStateT) parseRParen() {
 	s.natom++
 
 	// Now emit the tEndRegister
+	/*
+		dlog.Printf("tEndRegister j=%d pos=%d r#=%d rName=%s",
+			s.j,
+			s.input.pos,
+			s.p[s.j].groupNum,
+			s.p[s.j].groupName)
+	*/
 	s.tokenChan <- tokenT{
 		ttype:   tEndRegister,
 		pos:     s.input.pos,

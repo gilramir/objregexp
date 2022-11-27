@@ -87,3 +87,16 @@ func (s *MySuite) TestMustStartWith(c *C) {
 	c.Assert(err, IsNil)
 	c.Check(re.mustStartWith(), IsNil)
 }
+
+func (s *MySuite) TestCompileNestedGroupNames(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddIdentity("a", 'a')
+	compiler.AddIdentity("b", 'b')
+	compiler.AddIdentity("c", 'c')
+	compiler.Finalize()
+
+	rt := "(?P<xtra>[:a:]) ([:a:]) "
+	_, err := compiler.Compile(rt)
+	c.Assert(err, IsNil)
+}
