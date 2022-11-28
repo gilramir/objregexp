@@ -421,7 +421,8 @@ func (s *nfaFactory[T]) token2nfa(tnum int, token tokenT) error {
 		}
 		if token.regName != "" {
 			if registeredNum, has := s.regNameMap[token.regName]; has {
-				panic(fmt.Sprintf("reg#%d has name %s but it was seen with #%d", token.regNum, token.regName, registeredNum))
+				return fmt.Errorf("Capture group name '%s' is for registers %d and %d", token.regName,
+					registeredNum, token.regNum)
 			}
 			s.regNameMap[token.regName] = token.regNum
 		}

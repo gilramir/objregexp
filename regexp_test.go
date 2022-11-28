@@ -100,3 +100,14 @@ func (s *MySuite) TestCompileNestedGroupNames(c *C) {
 	_, err := compiler.Compile(rt)
 	c.Assert(err, IsNil)
 }
+
+func (s *MySuite) TestCompileDuplicateGroupNames(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddIdentity("a", 'a')
+	compiler.Finalize()
+
+	rt := "(?P<foo>[:a:]) (?P<foo>[:a:]) "
+	_, err := compiler.Compile(rt)
+	c.Assert(err, NotNil)
+}
