@@ -219,7 +219,9 @@ func (s *Regexp[T]) matchAt(input []T, start int, full bool) Match {
 			registers:  make([]Range, s.numRegisters),
 			regNameMap: s.regNameMap,
 		}
+		//		if xns != nil {
 		copy(m.registers, xns.registers.ranges)
+		//		}
 		return m
 	} else {
 		return Match{

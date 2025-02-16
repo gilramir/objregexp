@@ -387,3 +387,159 @@ func (s *MySuite) TestRegexpGroup01(c *C) {
 	c.Check(g.Start, Equals, 3)
 	c.Check(g.End, Equals, 4)
 }
+
+// Correctly match an empty sequence
+func (s *MySuite) TestRegexpMatchEmpty01(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "[:vowel:]*"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+}
+
+// Correctly match an empty sequence with $
+func (s *MySuite) TestRegexpMatchEmpty02(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "[:vowel:]*$"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+}
+
+// Correctly FullMatch an empty sequence
+func (s *MySuite) TestRegexpMatchEmpty03(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "[:vowel:]*"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+}
+
+// Correctly FullMatch an empty sequence, with $
+func (s *MySuite) TestRegexpMatchEmpty04(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "[:vowel:]*$"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+}
+
+// Correctly match an empty sequence, with group
+func (s *MySuite) TestRegexpMatchEmpty05(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "([:vowel:]*)"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+
+	c.Check(m.Group(1).Start, Equals, -1)
+	c.Check(m.Group(1).End, Equals, -1)
+}
+
+// Correctly match an empty sequence with $, with group
+func (s *MySuite) TestRegexpMatchEmpty06(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "([:vowel:]*)$"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.Match(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+
+	c.Check(m.Group(1).Start, Equals, -1)
+	c.Check(m.Group(1).End, Equals, -1)
+}
+
+// Correctly FullMatch an empty sequence, with group
+func (s *MySuite) TestRegexpMatchEmpty07(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "([:vowel:]*)"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+
+	c.Check(m.Group(1).Start, Equals, -1)
+	c.Check(m.Group(1).End, Equals, -1)
+}
+
+// Correctly FullMatch an empty sequence, with $, with group
+func (s *MySuite) TestRegexpMatchEmpty08(c *C) {
+	var compiler Compiler[rune]
+	compiler.Initialize()
+	compiler.AddClass(VowelClass)
+	compiler.Finalize()
+
+	text := "([:vowel:]*)$"
+	re, err := compiler.Compile(text)
+	c.Assert(err, IsNil)
+
+	input := []rune{}
+	m := re.FullMatch(input)
+	c.Check(m.Success, Equals, true)
+	c.Check(m.Range.Start, Equals, 0)
+	c.Check(m.Range.End, Equals, 0)
+
+	c.Check(m.Group(1).Start, Equals, -1)
+	c.Check(m.Group(1).End, Equals, -1)
+}

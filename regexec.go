@@ -141,7 +141,7 @@ type hitT[T comparable] struct {
 // If full is false, return true as soon as a match is found
 func (s *executorT[T]) match(start *nfaStateT[T], input []T, from int, full bool) (bool, int, *nfaRegStateT[T]) {
 	ok, count, xns := s._match(start, input, from, full)
-	if ok {
+	if ok { //&& xns != nil {
 		// It's possible for us to have -1's on one side (start/end)
 		// of the range of a register. That's ok, but we need to clean
 		// them up.
@@ -186,41 +186,76 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 	// and not return too early
 	var hit hitT[T]
 
-	for i := from; i < len(input); i++ {
-		ch := input[i]
-		dlog.Printf("=========================================")
-		dlog.Printf("Input #%d: %v", i, ch)
-		dlog.Printf("clist has %d items:", len(clist))
+	haystackSize := len(input) - from
 
+	// Very special case of 0-length haystack
+	if haystackSize == 0 {
+		// Are any of the valid states a MATCH?
 		for cxi, cxsr := range clist {
 			cxs := cxsr.root
-			dlog.Printf("clist item #%d regs:%v\n%s", cxi, cxsr.registers.ranges, cxs.Repr())
-		}
-
-		nlist = s.step(i, clist, ch, nlist)
-		clist, nlist = nlist, clist
-
-		if !full {
-			if matched, xns := s.ismatch(i+1, clist); matched {
-				hit = hitT[T]{x: xns, length: i - from + 1}
-				dlog.Printf("MATCHED and stored hit %+v", hit)
-				// keep going
-			} else {
-				dlog.Printf("NO MATCH; prev hit was %+v\n", hit)
-				if hit.x != nil {
-					// now we can return
+			dlog.Printf("(len=0) clist item #%d regs:%v\n%s", cxi, cxsr.registers.ranges, cxs.Repr())
+			ns := cxs.st
+			if ns.c == ntMatch {
+				if matched, xns := s.ismatch(0, clist); matched {
+					hit = hitT[T]{x: xns, length: 0}
+					dlog.Printf("MATCHED and stored hit %+v", hit)
 					return true, hit.length, hit.x
+				} else {
+					dlog.Printf("NO MATCH; prev hit was %+v\n", hit)
+					if hit.x != nil {
+						// now we can return
+						return true, hit.length, hit.x
+					}
+				}
+				// Shouldn't reach here, but, just in case
+				return true, 0, nil
+			}
+			// If we are doing a FullMatch with an "$", like:
+			// "[:vowel:]*$", we ned to check for matchesEnd
+			if full {
+				if matched, xns := s.matchesEnd(haystackSize, clist); matched {
+					return true, haystackSize, xns
 				}
 			}
+		}
+		// fall through
+	} else {
+		for i := from; i < len(input); i++ {
+			ch := input[i]
+			dlog.Printf("=========================================")
+			dlog.Printf("Input #%d: %v", i, ch)
+			dlog.Printf("clist has %d items:", len(clist))
+
+			for cxi, cxsr := range clist {
+				cxs := cxsr.root
+				dlog.Printf("clist item #%d regs:%v\n%s", cxi, cxsr.registers.ranges, cxs.Repr())
+			}
+
+			nlist = s.step(i, clist, ch, nlist)
+			clist, nlist = nlist, clist
+
+			if !full {
+				if matched, xns := s.ismatch(i+1, clist); matched {
+					hit = hitT[T]{x: xns, length: i - from + 1}
+					dlog.Printf("MATCHED and stored hit %+v", hit)
+					// keep going
+				} else {
+					dlog.Printf("NO MATCH; prev hit was %+v\n", hit)
+					if hit.x != nil {
+						// now we can return
+						return true, hit.length, hit.x
+					}
+				}
+			}
+
 		}
 	}
 
 	// After the loop, match any $ tokens
-
 	if full {
-		// If looking for a full match, did we match at the end?
-		if matched, xns := s.ismatch(len(input)-from, clist); matched {
-			return true, len(input) - from, xns
+		// If looking for a full match, did we match the $ at the end?
+		if matched, xns := s.ismatch(haystackSize, clist); matched {
+			return true, haystackSize, xns
 		} else {
 			return false, 0, nil
 		}
@@ -230,8 +265,9 @@ func (s *executorT[T]) _match(start *nfaStateT[T], input []T, from int, full boo
 			// now we can return
 			return true, hit.length, hit.x
 		}
-		if matched, xns := s.matchesEnd(len(input)-from, clist); matched {
-			return true, len(input) - from, xns
+		// Do we still have the $ to match? Are we at the end?
+		if matched, xns := s.matchesEnd(haystackSize, clist); matched {
+			return true, haystackSize, xns
 		}
 		// If we weren't looking for a full match, and didn't already find
 		// it, then we didn't find it.
@@ -395,6 +431,7 @@ func (s *executorT[T]) ismatch(pos int, l []*nfaRegStateT[T]) (bool, *nfaRegStat
 	return false, nil
 }
 
+// Check if we match "$"
 func (s *executorT[T]) matchesEnd(pos int, l []*nfaRegStateT[T]) (bool, *nfaRegStateT[T]) {
 	for _, nsr := range l {
 		ns := nsr.root

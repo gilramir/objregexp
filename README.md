@@ -96,6 +96,9 @@ Here are some sample regexes, assuming that "vowel", "consonant",
     # Save the value in a numbered "capture group"
     ([:vowel:] | [:consonant:] [:vowel:])
 
+    # Name the matched group "foo"
+    (?P<foo>[:vowel:] | [:consonant:] [:vowel:])
+
     # Match one or more vowel objects
     [:vowel:]+
 
@@ -241,6 +244,9 @@ Regexp object.
 
 # Internals
 
+The code was inspired by
+[Regular Expression Matching Can Be Simple and Fast](https://swtch.com/~rsc/regexp/regexp1.html)
+
 Files:
 
 * class.go - this defines the struct for Class
@@ -269,11 +275,4 @@ the state used while traversing the sequence of objects.
 
 # Bugs
 
-A regexp that matches on an empty list of objects won't actually
-match on an empty list of objects. For example, this regexp:
-
-```
-[:some class:]*
-```
-
-will fail to match an empty list of objects.
+None that are known.
